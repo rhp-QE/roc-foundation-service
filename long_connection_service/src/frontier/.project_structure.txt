@@ -1,0 +1,151 @@
+WebSocket 长连接服务项目结构
+=====================================
+
+frontier/
+├── connection.go           # 单个WebSocket连接的封装
+├── message.go             # 消息结构定义和验证
+├── hub.go                 # 消息分发中心和连接管理
+├── handler.go             # HTTP和WebSocket处理器
+├── server.go              # 服务器主入口
+├── config.go              # 配置结构和默认值
+├── example_test.go        # 示例代码和单元测试
+├── README.md              # 完整文档
+├── QUICKSTART.md          # 快速开始指南
+├── client_example.html    # 浏览器测试客户端
+├── main/
+│   └── main.go           # 服务启动入口
+└── scripts/
+    ├── build.sh          # 构建脚本
+    └── run.sh            # 运行脚本
+
+核心组件说明
+=============
+
+1. connection.go (连接管理)
+   - Connection 结构：封装单个WebSocket连接
+   - ReadPump：处理消息接收
+   - WritePump：处理消息发送
+   - 元数据管理
+   - 心跳和活跃状态检查
+
+2. message.go (消息处理)
+   - Message 结构：统一消息格式
+   - 消息类型定义（auth, heartbeat, chat, notify, error, ack, broadcast）
+   - 消息验证
+   - 数据访问辅助方法
+
+3. hub.go (中心调度)
+   - Hub 结构：管理所有连接
+   - 连接注册/注销
+   - 消息路由和分发
+   - 心跳检查
+   - 统计信息收集
+   - 自定义消息处理器注册
+
+4. handler.go (请求处理)
+   - WebSocketHandler：处理WebSocket连接升级
+   - StatsHandler：提供统计信息API
+   - HealthHandler：健康检查API
+   - 内置消息处理器（认证、聊天、广播）
+
+5. server.go (服务器)
+   - Server 结构：服务器主控制器
+   - 启动/停止服务
+   - 路由注册
+   - 组件集成
+
+6. config.go (配置)
+   - Config 结构：服务配置
+   - 默认配置
+   - 配置验证
+
+API 端点
+========
+
+- ws://localhost:8080/ws?user_id={user_id}  # WebSocket连接
+- http://localhost:8080/health              # 健康检查
+- http://localhost:8080/stats               # 统计信息
+
+快速启动
+========
+
+1. 安装依赖
+   cd /root/project/imcloud/roc-foundation-service
+   go mod tidy
+
+2. 启动服务
+   cd long_connection_service/src/frontier
+   ./scripts/run.sh
+
+3. 测试连接
+   用浏览器打开 client_example.html
+
+技术栈
+======
+
+- Go 1.22.2
+- gorilla/websocket (WebSocket实现)
+- google/uuid (唯一ID生成)
+
+特性
+====
+
+✓ 完整的WebSocket长连接支持
+✓ 连接状态管理和监控
+✓ 自动心跳检测
+✓ 消息路由和分发
+✓ 用户多设备支持
+✓ 自定义消息处理器
+✓ 统计信息收集
+✓ 优雅关闭
+✓ 可配置的超时和缓冲区
+✓ TLS支持
+✓ RESTful API（健康检查、统计）
+
+生产就绪特性
+============
+
+✓ 并发安全（使用sync.RWMutex）
+✓ 错误处理和恢复
+✓ 连接泄漏防护（closeOnce）
+✓ 消息缓冲和批量发送
+✓ 可配置的资源限制
+✓ 结构化日志输出
+✓ 单元测试覆盖
+✓ 完整文档
+
+扩展建议
+========
+
+1. 认证系统
+   - 集成JWT token验证
+   - 实现权限控制
+
+2. 消息持久化
+   - 离线消息存储
+   - 消息历史查询
+
+3. 集群支持
+   - Redis Pub/Sub消息同步
+   - 分布式会话管理
+
+4. 监控告警
+   - Prometheus metrics
+   - 自定义告警规则
+
+5. 速率限制
+   - 基于令牌桶的限流
+   - 防止滥用
+
+6. 消息加密
+   - 端到端加密
+   - 传输层加密
+
+更多信息
+========
+
+详细文档：README.md
+快速开始：QUICKSTART.md
+代码示例：example_test.go
+测试客户端：client_example.html
+
