@@ -1,9 +1,13 @@
 package frontier
 
 import (
+	"context"
+	"log"
 	"sync"
 	"time"
+
 )
+
 
 // Hub 维护所有活跃的连接并处理消息分发
 type Hub struct {
@@ -36,6 +40,9 @@ type Hub struct {
 
 	// 统计信息
 	stats *HubStats
+
+	// 服务上下文（可选，用于存储连接状态）
+	serviceCtx ServiceContext
 }
 
 // HubStats Hub统计信息
@@ -51,17 +58,42 @@ type HubStats struct {
 type MessageHandler func(*Connection, *Message) error
 
 // NewHub 创建新的Hub
-func NewHub() *Hub {
+func NewHub(serviceCtx ServiceContext) *Hub {
+	if serviceCtx == nil {
+		panic("ServiceContext cannot be nil")
+	}
+
+	// 从 ServiceContext 获取配置
+	config := serviceCtx.GetFrontierConfig()
+	if config == nil {
+		config = DefaultConfig()
+	}
+
+	if err := config.Validate(); err != nil {
+		panic(err)
+	}
+
+	heartbeatInterval := 30 * time.Second
+	connectionTimeout := 90 * time.Second
+
+	if config.HeartbeatInterval > 0 {
+		heartbeatInterval = config.HeartbeatInterval
+	}
+	if config.ConnectionTimeout > 0 {
+		connectionTimeout = config.ConnectionTimeout
+	}
+
 	return &Hub{
 		connections:       make(map[string]*Connection),
 		userConnections:   make(map[string]map[string]*Connection),
 		Register:          make(chan *Connection),
 		Unregister:        make(chan *Connection),
 		messageHandlers:   make(map[string]MessageHandler),
-		heartbeatInterval: 30 * time.Second,
-		connectionTimeout: 90 * time.Second,
+		heartbeatInterval: heartbeatInterval,
+		connectionTimeout: connectionTimeout,
 		stopChan:          make(chan struct{}),
 		stats:             &HubStats{},
+		serviceCtx:        serviceCtx,
 	}
 }
 
@@ -118,10 +150,57 @@ func (h *Hub) registerConnection(conn *Connection) {
 	h.stats.TotalConnections++
 	h.stats.ActiveConnections++
 	h.stats.mu.Unlock()
+
+	// 更新 Redis（如果配置了 ServiceContext）
+	if h.serviceCtx != nil && conn.UserID != "" {
+		go h.updateRedisOnRegister(context.Background(), conn)
+	}
+}
+
+// updateRedisOnRegister 在 Redis 中注册连接
+func (h *Hub) updateRedisOnRegister(ctx context.Context, conn *Connection) {
+	if h.serviceCtx == nil {
+		return
+	}
+
+	redis := h.serviceCtx.GetRedis()
+	if redis == nil {
+		return
+	}
+
+	localAddress := h.serviceCtx.GetLocalAddress()
+
+	// 1. 在用户连接 Hash 中添加 connectionID -> 机器地址映射
+	userKey := h.serviceCtx.GetUserConnectionKey(conn.UserID)
+	err := redis.HSet(ctx, userKey, conn.ID, localAddress)
+	if err != nil {
+		log.Printf("Failed to update user connection in Redis for user %s: %v", conn.UserID, err)
+		return
+	}
+
+	// 2. 在连接 key 中存储连接所在的机器地址
+	connectionKey := h.serviceCtx.GetConnectionKey(conn.ID)
+	err = redis.Set(ctx, connectionKey, localAddress, 24*time.Hour)
+	if err != nil {
+		log.Printf("Failed to set connection address in Redis for connection %s: %v", conn.ID, err)
+		return
+	}
+
+	log.Printf("Registered connection %s (user: %s) in Redis at %s", conn.ID, conn.UserID, localAddress)
 }
 
 // unregisterConnection 注销连接
 func (h *Hub) unregisterConnection(conn *Connection) {
+	h.mu.Lock()
+	userID := conn.UserID
+	connectionID := conn.ID
+	h.mu.Unlock()
+
+	// 先更新 Redis（如果配置了 ServiceContext），避免并发问题
+	if h.serviceCtx != nil && userID != "" {
+		go h.updateRedisOnUnregister(context.Background(), userID, connectionID)
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -129,11 +208,11 @@ func (h *Hub) unregisterConnection(conn *Connection) {
 	delete(h.connections, conn.ID)
 
 	// 从用户连接映射中删除
-	if conn.UserID != "" {
-		if userConns, ok := h.userConnections[conn.UserID]; ok {
+	if userID != "" {
+		if userConns, ok := h.userConnections[userID]; ok {
 			delete(userConns, conn.ID)
 			if len(userConns) == 0 {
-				delete(h.userConnections, conn.UserID)
+				delete(h.userConnections, userID)
 			}
 		}
 	}
@@ -142,6 +221,35 @@ func (h *Hub) unregisterConnection(conn *Connection) {
 	h.stats.mu.Lock()
 	h.stats.ActiveConnections--
 	h.stats.mu.Unlock()
+}
+
+// updateRedisOnUnregister 在 Redis 中注销连接
+func (h *Hub) updateRedisOnUnregister(ctx context.Context, userID, connectionID string) {
+	if h.serviceCtx == nil {
+		return
+	}
+
+	redis := h.serviceCtx.GetRedis()
+	if redis == nil {
+		return
+	}
+
+	// 1. 从用户连接 Hash 中删除 connectionID
+	userKey := h.serviceCtx.GetUserConnectionKey(userID)
+	_, err := redis.HDel(ctx, userKey, connectionID)
+	if err != nil {
+		log.Printf("Failed to remove connection from user hash in Redis for user %s: %v", userID, err)
+	}
+
+	// 2. 删除连接的机器地址 key
+	connectionKey := h.serviceCtx.GetConnectionKey(connectionID)
+	err = redis.Delete(ctx, connectionKey)
+	if err != nil {
+		log.Printf("Failed to delete connection address from Redis for connection %s: %v", connectionID, err)
+		return
+	}
+
+	log.Printf("Unregistered connection %s (user: %s) from Redis", connectionID, userID)
 }
 
 // GetConnection 根据连接ID获取连接
@@ -263,7 +371,6 @@ func (h *Hub) defaultHandler(conn *Connection, msg *Message) {
 	case MessageTypeHeartbeat:
 		// 心跳响应
 		response := NewMessage(MessageTypeHeartbeat)
-		response.SetPayload("status", "ok")
 		conn.SendMessage(response)
 
 	default:

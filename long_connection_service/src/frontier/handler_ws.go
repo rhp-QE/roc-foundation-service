@@ -37,24 +37,28 @@ func (h *WebSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 从请求中获取用户信息（这里简化处理，实际应该从token中解析）
-	userID := r.URL.Query().Get("user_id")
-	if userID == "" {
-		conn.Close()
-		return
-	}
+	// 从请求中获取验证信息（token、track_id等）放到元数据中
+	token := r.URL.Query().Get("token")
+	trackID := r.URL.Query().Get("track_id")
+	userID := r.URL.Query().Get("user_id") // 临时处理，实际应该从token解析
 
 	// 创建连接对象
 	connectionID := uuid.New().String()
 	connection := NewConnection(connectionID, userID, conn, h.hub)
 
+	// 如果连接时有验证信息，保存到连接的元数据中
+	if token != "" {
+		connection.SetMetadata("token", token)
+	}
+	if trackID != "" {
+		connection.SetMetadata("track_id", trackID)
+	}
+
 	// 注册连接
 	h.hub.Register <- connection
 
-	// 发送欢迎消息
+	// 发送欢迎消息（网关不解析payload，由业务方处理）
 	welcomeMsg := NewMessage(MessageTypePush)
-	welcomeMsg.SetPayload("message", "Connected successfully")
-	welcomeMsg.SetPayload("connection_id", connectionID)
 	connection.SendMessage(welcomeMsg)
 
 	// 启动读写协程
@@ -63,27 +67,25 @@ func (h *WebSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleAuth 处理认证请求
+// 注意：网关不解析payload，认证逻辑应由业务方处理
+// token、track_id等验证信息应该放在metadata中，payload是业务数据
 func (h *WebSocketHandler) HandleAuth(conn *Connection, msg *Message) error {
-	token, ok := msg.GetPayloadString("token")
-	if !ok {
-		return ErrUnauthorized
+	// 从metadata中获取验证信息（token、track_id等）
+	// 网关只负责转发，不解析payload内容
+	// 业务方应该从 msg.GetMetadata() 中获取验证信息，从 msg.Payload 中获取业务数据
+
+	// 将metadata中的验证信息保存到连接的元数据中
+	if token, ok := msg.GetMetadata("token"); ok {
+		conn.SetMetadata("token", token)
+	}
+	if trackID, ok := msg.GetMetadata("track_id"); ok {
+		conn.SetMetadata("track_id", trackID)
+	}
+	if userID, ok := msg.GetMetadata("user_id"); ok {
+		conn.UserID = userID
 	}
 
-	// TODO: 验证token
-	_ = token
-
-	// 更新连接的用户ID
-	userID, ok := msg.GetPayloadString("user_id")
-	if !ok {
-		return ErrUnauthorized
-	}
-
-	conn.UserID = userID
-
-	// 发送认证成功消息
 	response := NewMessage(MessageTypeAuth)
-	response.SetPayload("status", "success")
-	response.SetPayload("user_id", userID)
 	return conn.SendMessage(response)
 }
 
@@ -98,16 +100,11 @@ func (h *WebSocketHandler) HandleMessage(conn *Connection, msg *Message) error {
 	}
 
 	// TODO: 这里应该根据 service 和 method 转发到后端服务
-	// 示例：调用后端微服务
-	// response, err := h.callBackendService(msg.Service, msg.Method, msg.Data)
+	// 网关将 msg.Payload（业务数据）和 msg.Metadata（验证信息如token、track_id等）原样转发给后端服务
+	// response, err := h.callBackendService(msg.Service, msg.Method, msg.Payload, msg.Metadata)
 
 	// 临时实现：返回一个示例响应
-	response := NewResponseMessage(msg.ID)
-	response.SetPayload("service", msg.Service)
-	response.SetPayload("method", msg.Method)
-	response.SetPayload("status", "success")
-	response.SetPayload("message", "Request received and will be processed")
-
+	response := NewResponseMessage(msg.RequestID)
 	return conn.SendMessage(response)
 }
 

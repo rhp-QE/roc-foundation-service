@@ -20,27 +20,27 @@ const (
 // Config WebSocket服务配置
 type Config struct {
 	// 服务地址
-	Host string
-	Port string
+	Host string `yaml:"host"`
+	Port string `yaml:"port"`
 
 	// 心跳配置
-	HeartbeatInterval time.Duration
-	ConnectionTimeout time.Duration
+	HeartbeatInterval time.Duration `yaml:"heartbeatInterval"`
+	ConnectionTimeout time.Duration `yaml:"connectionTimeout"`
 
 	// 消息配置
-	MaxMessageSize    int64
-	SendBufferSize    int
-	ReceiveBufferSize int
+	MaxMessageSize    int64 `yaml:"maxMessageSize"`
+	SendBufferSize    int   `yaml:"sendBufferSize"`
+	ReceiveBufferSize int   `yaml:"receiveBufferSize"`
 
 	// TLS配置
-	EnableTLS bool
-	CertFile  string
-	KeyFile   string
+	EnableTLS bool   `yaml:"enableTLS"`
+	CertFile  string `yaml:"certFile"`
+	KeyFile   string `yaml:"keyFile"`
 
 	// 其他配置
-	MaxConnections int
-	ReadTimeout    time.Duration
-	WriteTimeout   time.Duration
+	MaxConnections int           `yaml:"maxConnections"`
+	ReadTimeout    time.Duration `yaml:"readTimeout"`
+	WriteTimeout   time.Duration `yaml:"writeTimeout"`
 }
 
 // DefaultConfig 返回默认配置
@@ -76,4 +76,3 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
-

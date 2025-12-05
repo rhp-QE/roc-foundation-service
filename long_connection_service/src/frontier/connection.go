@@ -134,11 +134,8 @@ func (c *Connection) SendMessage(msg *Message) error {
 
 // SendError 发送错误消息
 func (c *Connection) SendError(errorMsg string) {
-	msg := &Message{
-		Type:      MessageTypeError,
-		Payload:   map[string]interface{}{"error": errorMsg},
-		Timestamp: time.Now().Unix(),
-	}
+	msg := NewMessage(MessageTypeError)
+	msg.Error = errorMsg
 	c.SendMessage(msg)
 }
 

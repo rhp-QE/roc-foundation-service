@@ -1,0 +1,35 @@
+# 注册中心配置
+registry:
+  etcd:
+    endpoints:
+      - localhost:2379
+    rootPath: "/long-connection-service"
+
+# Redis 服务配置（从注册中心获取）
+redis:
+  serviceName: "redis-service"  # 服务名称，用于从注册中心获取 Redis 实例
+  password: "redis123"          # Redis 密码
+
+# Frontier WebSocket 服务配置
+frontier:
+  host: "0.0.0.0"
+  port: "6060"
+  
+  # 心跳配置（支持时间单位：ns, us, µs, ms, s, m, h）
+  heartbeatInterval: "30s"
+  connectionTimeout: "90s"
+  
+  # 消息配置
+  maxMessageSize: 524288    # 512KB
+  sendBufferSize: 256
+  receiveBufferSize: 1024
+  
+  # TLS配置
+  enableTLS: false
+  certFile: ""
+  keyFile: ""
+  
+  # 其他配置
+  maxConnections: 10000
+  readTimeout: "60s"
+  writeTimeout: "10s"

@@ -17,20 +17,22 @@ const (
 
 // Message WebSocket消息结构（网关模式）
 type Message struct {
-	ID        string                 `json:"id,omitempty"`      // 消息ID（用于请求-响应匹配）
-	Type      string                 `json:"type"`              // 消息类型
-	Service   string                 `json:"service,omitempty"` // 目标服务名称
-	Method    string                 `json:"method,omitempty"`  // 服务方法名称
-	Payload   map[string]interface{} `json:"payload,omitempty"` // 消息有效载荷/参数
-	Error     string                 `json:"error,omitempty"`   // 错误信息（响应时使用）
-	Timestamp int64                  `json:"timestamp"`         // 时间戳
+	RequestID string            `json:"requestID,omitempty"` // 请求ID（用于请求-响应匹配）
+	Type      string            `json:"type"`                // 消息类型
+	Service   string            `json:"service,omitempty"`   // 目标服务名称
+	Method    string            `json:"method,omitempty"`    // 服务方法名称
+	Payload   []byte            `json:"payload,omitempty"`   // 消息有效载荷/数据（字节数组，业务数据）
+	Error     string            `json:"error,omitempty"`     // 错误信息（响应时使用）
+	Timestamp int64             `json:"timestamp"`           // 时间戳
+	Metadata  map[string]string `json:"metadata,omitempty"`  // 元数据（用于传递验证信息如token、track_id等）
 }
 
 // NewMessage 创建新消息
 func NewMessage(msgType string) *Message {
 	return &Message{
 		Type:      msgType,
-		Payload:   make(map[string]interface{}),
+		Payload:   []byte{},
+		Metadata:  make(map[string]string),
 		Timestamp: time.Now().Unix(),
 	}
 }
@@ -41,7 +43,8 @@ func NewRequestMessage(service, method string) *Message {
 		Type:      MessageTypeRequest,
 		Service:   service,
 		Method:    method,
-		Payload:   make(map[string]interface{}),
+		Payload:   []byte{},
+		Metadata:  make(map[string]string),
 		Timestamp: time.Now().Unix(),
 	}
 }
@@ -49,9 +52,10 @@ func NewRequestMessage(service, method string) *Message {
 // NewResponseMessage 创建响应消息
 func NewResponseMessage(requestID string) *Message {
 	return &Message{
-		ID:        requestID,
+		RequestID: requestID,
 		Type:      MessageTypeResponse,
-		Payload:   make(map[string]interface{}),
+		Payload:   []byte{},
+		Metadata:  make(map[string]string),
 		Timestamp: time.Now().Unix(),
 	}
 }
@@ -59,9 +63,10 @@ func NewResponseMessage(requestID string) *Message {
 // NewErrorMessage 创建错误消息
 func NewErrorMessage(requestID, errorMsg string) *Message {
 	return &Message{
-		ID:        requestID,
+		RequestID: requestID,
 		Type:      MessageTypeError,
 		Error:     errorMsg,
+		Metadata:  make(map[string]string),
 		Timestamp: time.Now().Unix(),
 	}
 }
@@ -105,42 +110,21 @@ func (m *Message) IsResponseMessage() bool {
 	return m.Type == MessageTypeResponse
 }
 
-// GetPayloadString 获取字符串类型的载荷数据
-func (m *Message) GetPayloadString(key string) (string, bool) {
-	val, ok := m.Payload[key]
-	if !ok {
+// GetMetadata 从元数据中获取值
+func (m *Message) GetMetadata(key string) (string, bool) {
+	if m.Metadata == nil {
 		return "", false
 	}
-	str, ok := val.(string)
-	return str, ok
+	val, ok := m.Metadata[key]
+	return val, ok
 }
 
-// GetPayloadInt 获取整数类型的载荷数据
-func (m *Message) GetPayloadInt(key string) (int, bool) {
-	val, ok := m.Payload[key]
-	if !ok {
-		return 0, false
+// SetMetadata 设置元数据值
+func (m *Message) SetMetadata(key, value string) {
+	if m.Metadata == nil {
+		m.Metadata = make(map[string]string)
 	}
-
-	// 处理不同的数字类型
-	switch v := val.(type) {
-	case int:
-		return v, true
-	case float64:
-		return int(v), true
-	case int64:
-		return int(v), true
-	default:
-		return 0, false
-	}
-}
-
-// SetPayload 设置载荷数据
-func (m *Message) SetPayload(key string, value interface{}) {
-	if m.Payload == nil {
-		m.Payload = make(map[string]interface{})
-	}
-	m.Payload[key] = value
+	m.Metadata[key] = value
 }
 
 // 错误定义
