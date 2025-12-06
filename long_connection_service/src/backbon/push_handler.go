@@ -8,8 +8,8 @@ package backbon
 import (
 	"context"
 	"fmt"
-	"log"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
 	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
@@ -85,7 +85,7 @@ func (s *BackbonServiceImpl) handleBroadcast(frontierMsg *frontier.Message, resp
 
 	s.hub.Broadcast(frontierMsg)
 	resp.SuccessCount++
-	log.Printf("Broadcast message to all connections on local machine")
+	klog.Infof("Broadcast message to all connections on local machine")
 }
 
 // pushToUsers 推送到多个用户
@@ -189,10 +189,10 @@ func (s *BackbonServiceImpl) tryPushToLocalUser(
 	if err == nil {
 		result.Success = true
 		result.ConnectionCount = int32(len(conns))
-		log.Printf("Pushed message to user %s on local machine (%d connections)", userID, result.ConnectionCount)
+		klog.Infof("Pushed message to user %s on local machine (%d connections)", userID, result.ConnectionCount)
 	} else {
 		result.Error = err.Error()
-		log.Printf("Failed to push message to user %s on local machine: %v", userID, err)
+		klog.Errorf("Failed to push message to user %s on local machine: %v", userID, err)
 	}
 
 	return result
@@ -218,7 +218,7 @@ func (s *BackbonServiceImpl) pushToRemoteMachines(
 	// 从 Redis 获取用户的所有连接信息（connectionID -> machineAddr 映射）
 	connectionMappings, err := s.getUserConnectionMappings(ctx, userID, redisCache)
 	if err != nil {
-		log.Printf("User %s connection mappings not found in Redis: %v", userID, err)
+		klog.Warnf("User %s connection mappings not found in Redis: %v", userID, err)
 		return []*kitex_gen.PushResult{{
 			UserID:  userID,
 			Success: false,
@@ -288,7 +288,7 @@ func (s *BackbonServiceImpl) callRemotePushToConnection(
 	remoteClient, err := s.createRemoteClient(machineAddr)
 	if err != nil {
 		result.Error = fmt.Sprintf("failed to create remote client: %v", err)
-		log.Printf("Failed to create remote client for %s: %v", machineAddr, err)
+		klog.Errorf("Failed to create remote client for %s: %v", machineAddr, err)
 		return result
 	}
 
@@ -302,7 +302,7 @@ func (s *BackbonServiceImpl) callRemotePushToConnection(
 	remoteResp, err := remoteClient.PushToConnection(ctx, remoteReq)
 	if err != nil {
 		result.Error = fmt.Sprintf("failed to call remote PushToConnection service: %v", err)
-		log.Printf("Failed to call remote PushToConnection at %s for connection %s: %v", machineAddr, connectionID, err)
+		klog.Errorf("Failed to call remote PushToConnection at %s for connection %s: %v", machineAddr, connectionID, err)
 		return result
 	}
 
@@ -318,7 +318,7 @@ func (s *BackbonServiceImpl) callRemotePushToConnection(
 		result.ConnectionCount = 1 // PushToConnection 只推送一个连接
 	}
 
-	log.Printf("Pushed message to connection %s on remote machine %s: success=%v", connectionID, machineAddr, result.Success)
+	klog.Infof("Pushed message to connection %s on remote machine %s: success=%v", connectionID, machineAddr, result.Success)
 	return result
 }
 
@@ -358,10 +358,10 @@ func (s *BackbonServiceImpl) PushToConnection(ctx context.Context, req *kitex_ge
 			err := s.hub.SendToConnection(connectionID, frontierMsg)
 			if err == nil {
 				resp.Success = true
-				log.Printf("Pushed message to connection %s on local machine", connectionID)
+				klog.Infof("Pushed message to connection %s on local machine", connectionID)
 			} else {
 				resp.Error = err.Error()
-				log.Printf("Failed to push message to connection %s on local machine: %v", connectionID, err)
+				klog.Errorf("Failed to push message to connection %s on local machine: %v", connectionID, err)
 			}
 			return resp, err
 		}
@@ -379,7 +379,7 @@ func (s *BackbonServiceImpl) PushToConnection(ctx context.Context, req *kitex_ge
 	machineAddr, err := redisCache.Get(ctx, connectionKey)
 	if err != nil || stringutil.IsEmpty(machineAddr) {
 		resp.Error = fmt.Sprintf("connection %s not found in Redis", connectionID)
-		log.Printf("Connection %s not found in Redis", connectionID)
+		klog.Warnf("Connection %s not found in Redis", connectionID)
 		return resp, fmt.Errorf("connection %s not found", connectionID)
 	}
 
@@ -402,7 +402,7 @@ func (s *BackbonServiceImpl) callRemotePushToConnectionFromLocal(
 	remoteClient, err := s.createRemoteClient(machineAddr)
 	if err != nil {
 		resp.Error = fmt.Sprintf("failed to create remote client: %v", err)
-		log.Printf("Failed to create remote client for %s: %v", machineAddr, err)
+		klog.Errorf("Failed to create remote client for %s: %v", machineAddr, err)
 		return resp, err
 	}
 
@@ -416,7 +416,7 @@ func (s *BackbonServiceImpl) callRemotePushToConnectionFromLocal(
 	remoteResp, err := remoteClient.PushToConnection(ctx, remoteReq)
 	if err != nil {
 		resp.Error = fmt.Sprintf("failed to call remote PushToConnection service: %v", err)
-		log.Printf("Failed to call remote PushToConnection at %s for connection %s: %v", machineAddr, connectionID, err)
+		klog.Errorf("Failed to call remote PushToConnection at %s for connection %s: %v", machineAddr, connectionID, err)
 		return resp, err
 	}
 
@@ -428,6 +428,6 @@ func (s *BackbonServiceImpl) callRemotePushToConnectionFromLocal(
 	resp.Success = remoteResp.GetSuccess()
 	resp.Error = remoteResp.GetError()
 
-	log.Printf("Pushed message to connection %s on remote machine %s: success=%v", connectionID, machineAddr, resp.Success)
+	klog.Infof("Pushed message to connection %s on remote machine %s: success=%v", connectionID, machineAddr, resp.Success)
 	return resp, nil
 }

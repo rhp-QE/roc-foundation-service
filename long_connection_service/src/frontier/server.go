@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/roc/roc-foundation-util-go/cache"
 )
 
@@ -77,7 +78,7 @@ func (s *Server) Start() error {
 		WriteTimeout: config.WriteTimeout,
 	}
 
-	fmt.Printf("WebSocket server starting on %s\n", addr)
+	klog.Infof("WebSocket server starting on %s", addr)
 
 	// 启动服务器（阻塞调用，会一直运行直到调用 Shutdown）
 	// ListenAndServe 只在以下情况返回：

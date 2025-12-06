@@ -8,12 +8,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/google/uuid"
 	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/config"
@@ -88,7 +88,7 @@ func (ctx *ServiceContext) init() error {
 	// 在这里向注册中心注册 redis 服务 ip 是本地IP （先mock 生产环境再改）
 	if ctx.Config.Redis.ServiceName != "" {
 		if err := ctx.registerRedisService(); err != nil {
-			log.Printf("Warning: Failed to register Redis service: %v", err)
+			klog.Warnf("Failed to register Redis service: %v", err)
 			// 注册失败不阻塞启动，但会记录警告
 		}
 	}
@@ -96,7 +96,7 @@ func (ctx *ServiceContext) init() error {
 	// 初始化 Redis 客户端
 	if ctx.Config.Redis.ServiceName != "" {
 		if err := ctx.initRedis(); err != nil {
-			log.Printf("Warning: Failed to initialize Redis: %v", err)
+			klog.Warnf("Failed to initialize Redis: %v", err)
 			// Redis 初始化失败不阻塞启动，但会记录警告
 		}
 	}
@@ -142,7 +142,7 @@ func (ctx *ServiceContext) registerRedisService() error {
 		return fmt.Errorf("failed to register Redis service instance: %w", err)
 	}
 
-	log.Printf("Successfully registered Redis service: %s:%d (instance: %s)", localIP, redisPort, instanceID)
+	klog.Infof("Successfully registered Redis service: %s:%d (instance: %s)", localIP, redisPort, instanceID)
 	return nil
 }
 
@@ -169,7 +169,7 @@ func (ctx *ServiceContext) initRedis() error {
 	}
 
 	ctx.Redis = redisCache
-	log.Printf("Successfully connected to Redis at %s", redisAddress)
+	klog.Infof("Successfully connected to Redis at %s", redisAddress)
 	return nil
 }
 

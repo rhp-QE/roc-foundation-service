@@ -8,9 +8,9 @@ package backbon
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
 	"github.com/roc/roc-foundation-util-go/stringutil"
 )
@@ -70,11 +70,11 @@ func (s *BackbonServiceImpl) RegisterService(ctx context.Context, req *kitex_gen
 	// 设置过期时间（7天），可以通过心跳续期
 	err = redisCache.Expire(ctx, key, 7*24*time.Hour)
 	if err != nil {
-		log.Printf("Warning: failed to set expire for key %s: %v", key, err)
+		klog.Warnf("Failed to set expire for key %s: %v", key, err)
 	}
 
 	resp.Success = true
-	log.Printf("Successfully registered service: %s with methods: %v", serviceName, validMethods)
+	klog.Infof("Successfully registered service: %s with methods: %v", serviceName, validMethods)
 	return resp, nil
 }
 
@@ -111,7 +111,7 @@ func (s *BackbonServiceImpl) UnregisterService(ctx context.Context, req *kitex_g
 			return resp, err
 		}
 		resp.Success = true
-		log.Printf("Successfully unregistered service: %s (all methods)", serviceName)
+		klog.Infof("Successfully unregistered service: %s (all methods)", serviceName)
 		return resp, nil
 	}
 
@@ -137,7 +137,7 @@ func (s *BackbonServiceImpl) UnregisterService(ctx context.Context, req *kitex_g
 	}
 
 	resp.Success = true
-	log.Printf("Successfully unregistered service: %s with methods: %v", serviceName, validMethods)
+	klog.Infof("Successfully unregistered service: %s with methods: %v", serviceName, validMethods)
 	return resp, nil
 }
 

@@ -2,10 +2,10 @@ package frontier
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 
@@ -174,7 +174,7 @@ func (h *Hub) updateRedisOnRegister(ctx context.Context, conn *Connection) {
 	userKey := h.serviceCtx.GetUserConnectionKey(conn.UserID)
 	err := redis.HSet(ctx, userKey, conn.ID, localAddress)
 	if err != nil {
-		log.Printf("Failed to update user connection in Redis for user %s: %v", conn.UserID, err)
+		klog.Errorf("Failed to update user connection in Redis for user %s: %v", conn.UserID, err)
 		return
 	}
 
@@ -182,11 +182,11 @@ func (h *Hub) updateRedisOnRegister(ctx context.Context, conn *Connection) {
 	connectionKey := h.serviceCtx.GetConnectionKey(conn.ID)
 	err = redis.Set(ctx, connectionKey, localAddress, 24*time.Hour)
 	if err != nil {
-		log.Printf("Failed to set connection address in Redis for connection %s: %v", conn.ID, err)
+		klog.Errorf("Failed to set connection address in Redis for connection %s: %v", conn.ID, err)
 		return
 	}
 
-	log.Printf("Registered connection %s (user: %s) in Redis at %s", conn.ID, conn.UserID, localAddress)
+	klog.Infof("Registered connection %s (user: %s) in Redis at %s", conn.ID, conn.UserID, localAddress)
 }
 
 // unregisterConnection 注销连接
@@ -238,18 +238,18 @@ func (h *Hub) updateRedisOnUnregister(ctx context.Context, userID, connectionID 
 	userKey := h.serviceCtx.GetUserConnectionKey(userID)
 	_, err := redis.HDel(ctx, userKey, connectionID)
 	if err != nil {
-		log.Printf("Failed to remove connection from user hash in Redis for user %s: %v", userID, err)
+		klog.Errorf("Failed to remove connection from user hash in Redis for user %s: %v", userID, err)
 	}
 
 	// 2. 删除连接的机器地址 key
 	connectionKey := h.serviceCtx.GetConnectionKey(connectionID)
 	err = redis.Delete(ctx, connectionKey)
 	if err != nil {
-		log.Printf("Failed to delete connection address from Redis for connection %s: %v", connectionID, err)
+		klog.Errorf("Failed to delete connection address from Redis for connection %s: %v", connectionID, err)
 		return
 	}
 
-	log.Printf("Unregistered connection %s (user: %s) from Redis", connectionID, userID)
+	klog.Infof("Unregistered connection %s (user: %s) from Redis", connectionID, userID)
 }
 
 // GetConnection 根据连接ID获取连接

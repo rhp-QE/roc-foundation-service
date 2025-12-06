@@ -23,13 +23,27 @@ import (
 )
 
 func main() {
+	// 使用 foundation-util-go 统一初始化 OTEL（初始化 klog）
+	kit, err := otel.InitOTEL(context.Background(),
+		otel.WithServiceName("frontier"),
+		otel.WithEndpoint("localhost:4317"),
+		otel.WithInsecure(true),
+	)
+	if err != nil {
+		// 注意：OTEL 初始化失败时，klog 还未初始化，使用标准库 log
+		log.Fatalf("Failed to init OTEL: %v", err)
+	}
+	defer kit.Shutdown(context.Background())
+
+	// 设置日志级别为 DEBUG
+	kit.Logger.SetLevel(klog.LevelDebug)
+
 	// 创建服务上下文（内部加载配置并统一管理所有共享资源）
 	serviceCtx, err := NewServiceContext("config.yaml")
 	if err != nil {
-		log.Fatalf("Failed to create service context: %v", err)
+		klog.Fatalf("Failed to create service context: %v", err)
 	}
 	defer serviceCtx.Close()
-
 
 	instanceID := fmt.Sprintf("backbon-service-%s", uuid.New().String()[:8])
 	instance := &foundationregistry.ServiceInstance{
@@ -44,19 +58,8 @@ func main() {
 	}
 
 	if err := serviceCtx.Registry.Register(context.Background(), instance); err != nil {
-		log.Fatalf("Failed to register service instance: %v", err)
+		klog.Fatalf("Failed to register service instance: %v", err)
 	}
-
-	// 使用 foundation-util-go 统一初始化 OTEL
-	kit, err := otel.InitOTEL(context.Background(),
-		otel.WithServiceName("backbon-service"),
-		otel.WithEndpoint("localhost:4317"),
-		otel.WithInsecure(true),
-	)
-	if err != nil {
-		log.Fatalf("Failed to init OTEL: %v", err)
-	}
-	defer kit.Shutdown(context.Background())
 
 	// 创建 Frontier 服务器（从 ServiceContext 获取配置）
 	frontierServer := frontier.NewServer(serviceCtx)
@@ -72,23 +75,20 @@ func main() {
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "backbon-service"}),
 	)
 
-	// 设置日志级别为 DEBUG
-	kit.Logger.SetLevel(klog.LevelDebug)
-
 	// 优雅关闭处理
 	defer func() {
 		if err := serviceCtx.Registry.Deregister(context.Background(), instance); err != nil {
-			log.Printf("Failed to deregister service instance: %v", err)
+			klog.Errorf("Failed to deregister service instance: %v", err)
 		}
 	}()
 
-	log.Printf("Backbon service starting - instance_id: %s, address: %s:%d", instanceID, serviceCtx.GetLocalAddress(), 8956)
+	klog.Infof("Backbon service starting - instance_id: %s, address: %s:%d", instanceID, serviceCtx.GetLocalAddress(), 8956)
 
 	// 启动 Frontier 服务器
 	go func() {
 		err := frontierServer.Start()
 		if err != nil {
-			log.Fatalf("Failed to start frontier server: %v", err)
+			klog.Fatalf("Failed to start frontier server: %v", err)
 		}
 	}()
 
@@ -96,7 +96,7 @@ func main() {
 	go func() {
 		err := backbonServer.Run()
 		if err != nil {
-			log.Fatalf("Failed to start backbon server: %v", err)
+			klog.Fatalf("Failed to start backbon server: %v", err)
 		}
 	}()
 
@@ -105,5 +105,5 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	log.Println("Shutting down...")
+	klog.Info("Shutting down...")
 }
