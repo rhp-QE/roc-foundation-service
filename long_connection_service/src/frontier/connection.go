@@ -78,7 +78,9 @@ func (c *Connection) ReadPump() {
 		}
 
 		// 处理消息
-		c.Hub.HandleMessage(c, &msg)
+		go func() {
+			c.Hub.HandleMessage(c, &msg)
+		}()
 	}
 }
 

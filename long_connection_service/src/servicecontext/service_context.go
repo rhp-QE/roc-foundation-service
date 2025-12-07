@@ -1,9 +1,9 @@
-// Package main 服务上下文，管理全局共享资源
+// Package servicecontext 服务上下文，管理全局共享资源
 //
 // Author: Ruan Huipeng
 // Date: 2025-12-01
 
-package main
+package servicecontext
 
 import (
 	"context"
