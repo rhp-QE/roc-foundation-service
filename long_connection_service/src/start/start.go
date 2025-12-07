@@ -37,7 +37,42 @@ func Start(configPath string) error {
 		configPath = "config.yaml"
 	}
 
-	// 使用 foundation-util-go 统一初始化 OTEL（初始化 klog）
+	// 初始化 OTEL
+	kit := initOTEL()
+	defer kit.Shutdown(context.Background())
+
+	// 创建服务上下文
+	serviceCtx := createServiceContext(configPath)
+	defer serviceCtx.Close()
+
+	// 获取本机地址
+	host := getLocalIP()
+
+	// 创建服务实例
+	instance := createServiceInstance(host)
+
+	// 创建服务器
+	frontierServer, backbonServer := createServers(serviceCtx, host)
+
+	// 启动服务器
+	startServers(frontierServer, backbonServer)
+
+	// 注册服务到 etcd
+	registerService(serviceCtx, instance)
+
+	// 设置优雅关闭处理
+	defer setupGracefulShutdown(serviceCtx, instance)
+
+	klog.Infof("Backbon service starting - instance_id: %s, address: %s:%d", instance.InstanceID, host, 8956)
+
+	// 等待关闭信号
+	waitForShutdown()
+
+	return nil
+}
+
+// initOTEL 初始化 OTEL 并设置日志级别
+func initOTEL() *otel.OTELKit {
 	kit, err := otel.InitOTEL(context.Background(),
 		otel.WithServiceName("frontier"),
 		otel.WithEndpoint("localhost:4317"),
@@ -47,37 +82,32 @@ func Start(configPath string) error {
 		// 注意：OTEL 初始化失败时，klog 还未初始化，使用标准库 log
 		log.Fatalf("Failed to init OTEL: %v", err)
 	}
-	defer kit.Shutdown(context.Background())
-
-	// 设置日志级别为 DEBUG
 	kit.Logger.SetLevel(klog.LevelDebug)
+	return kit
+}
 
-	// 创建服务上下文（内部加载配置并统一管理所有共享资源）
+// createServiceContext 创建服务上下文
+func createServiceContext(configPath string) *servicecontext.ServiceContext {
 	serviceCtx, err := servicecontext.NewServiceContext(configPath)
 	if err != nil {
 		klog.Fatalf("Failed to create service context: %v", err)
 	}
-	defer serviceCtx.Close()
+	return serviceCtx
+}
 
-	// 解析本机地址（格式：host:port）
-	localAddress := serviceCtx.GetLocalAddress()
-	host, _, err := net.SplitHostPort(localAddress)
+// getLocalIP 获取本机IP
+func getLocalIP() string {
+	host, err := network.GetLocalIP()
 	if err != nil {
-		// 如果解析失败，尝试获取本机IP
-		host, err = network.GetLocalIP()
-		if err != nil {
-			klog.Fatalf("Failed to get local IP: %v", err)
-		}
+		klog.Fatalf("Failed to get local IP: %v", err)
 	}
-	if host == "" || host == "0.0.0.0" {
-		host, err = network.GetLocalIP()
-		if err != nil {
-			klog.Fatalf("Failed to get local IP: %v", err)
-		}
-	}
+	return host
+}
 
+// createServiceInstance 创建服务实例信息
+func createServiceInstance(host string) *foundationregistry.ServiceInstance {
 	instanceID := fmt.Sprintf("backbon-service-%s", uuid.New().String()[:8])
-	instance := &foundationregistry.ServiceInstance{
+	return &foundationregistry.ServiceInstance{
 		ServiceName: "backbon-service",
 		InstanceID:  instanceID,
 		Host:        host,
@@ -87,14 +117,17 @@ func Start(configPath string) error {
 			"version": "1.0.0",
 		},
 	}
+}
 
-	// 创建 Frontier 服务器（从 ServiceContext 获取配置）
+// createServers 创建 Frontier 和 Backbon 服务器
+func createServers(serviceCtx *servicecontext.ServiceContext, host string) (*frontier.Server, server.Server) {
+	// 创建 Frontier 服务器
 	frontierServer := frontier.NewServer(serviceCtx)
 
-	// 创建 Backbon 服务，传入服务上下文
+	// 创建 Backbon 服务
 	backbonService := backbonImpl.NewBackbonServiceImpl(frontierServer.GetHub(), serviceCtx)
 
-	// 创建 Backbon RPC 服务器，配置服务地址、OTEL tracing 等
+	// 创建 Backbon RPC 服务器
 	backbonServer := backbon.NewServer(
 		backbonService,
 		server.WithServiceAddr(&net.TCPAddr{IP: net.ParseIP(host), Port: 8956}),
@@ -102,44 +135,49 @@ func Start(configPath string) error {
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "backbon-service"}),
 	)
 
-	klog.Infof("Backbon service starting - instance_id: %s, address: %s:%d", instanceID, host, 8956)
+	return frontierServer, backbonServer
+}
 
+// startServers 启动服务器
+func startServers(frontierServer *frontier.Server, backbonServer server.Server) {
 	// 启动 Frontier 服务器
 	go func() {
-		err := frontierServer.Start()
-		if err != nil {
+		if err := frontierServer.Start(); err != nil {
 			klog.Fatalf("Failed to start frontier server: %v", err)
 		}
 	}()
 
 	// 启动 Backbon RPC 服务器
 	go func() {
-		err := backbonServer.Run()
-		if err != nil {
+		if err := backbonServer.Run(); err != nil {
 			klog.Fatalf("Failed to start backbon server: %v", err)
 		}
 	}()
 
 	// 等待 1 秒确保服务已经启动并监听端口
 	time.Sleep(1 * time.Second)
+}
 
+// registerService 注册服务到 etcd
+func registerService(serviceCtx *servicecontext.ServiceContext, instance *foundationregistry.ServiceInstance) {
 	// 服务启动后再注册到 etcd，避免保活机制在服务未就绪时删除注册
 	if err := serviceCtx.Registry.Register(context.Background(), instance); err != nil {
 		klog.Fatalf("Failed to register service instance: %v", err)
 	}
 	klog.Infof("Successfully registered backbon-service to etcd")
-	// 优雅关闭处理
-	defer func() {
-		if err := serviceCtx.Registry.Deregister(context.Background(), instance); err != nil {
-			klog.Errorf("Failed to deregister service instance: %v", err)
-		}
-	}()
+}
 
-	// 优雅关闭
+// setupGracefulShutdown 设置优雅关闭处理
+func setupGracefulShutdown(serviceCtx *servicecontext.ServiceContext, instance *foundationregistry.ServiceInstance) {
+	if err := serviceCtx.Registry.Deregister(context.Background(), instance); err != nil {
+		klog.Errorf("Failed to deregister service instance: %v", err)
+	}
+}
+
+// waitForShutdown 等待关闭信号
+func waitForShutdown() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
-
 	klog.Info("Shutting down...")
-	return nil
 }
