@@ -42,6 +42,16 @@ func (c *Connection) ReadPump() {
 
 	// 设置读取超时
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+
+	// 设置 Ping 处理器：当客户端发送 WebSocket Ping 帧时，自动回复 Pong 并更新活跃时间
+	c.Conn.SetPingHandler(func(string) error {
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		c.UpdateLastActive()
+		// gorilla/websocket 会自动回复 Pong 帧，这里只需要更新活跃时间
+		return nil
+	})
+
+	// 设置 Pong 处理器：当客户端发送 WebSocket Pong 帧时，更新活跃时间
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		c.UpdateLastActive()

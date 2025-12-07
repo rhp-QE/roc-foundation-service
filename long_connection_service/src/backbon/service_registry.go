@@ -12,6 +12,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 	"github.com/roc/roc-foundation-util-go/stringutil"
 )
 
@@ -38,7 +39,7 @@ func (s *BackbonServiceImpl) RegisterService(ctx context.Context, req *kitex_gen
 	}
 
 	// 构建 Redis key: fronter:service:{serviceName}
-	key := s.getServiceKey(serviceName)
+	key := util.GetServiceKeyInCache(serviceName)
 	methods := req.GetMethods()
 
 	// 如果没有指定 methods，则使用特殊标记 "*" 表示所有方法都支持
@@ -100,7 +101,7 @@ func (s *BackbonServiceImpl) UnregisterService(ctx context.Context, req *kitex_g
 	}
 
 	// 构建 Redis key: fronter:service:{serviceName}
-	key := s.getServiceKey(serviceName)
+	key := util.GetServiceKeyInCache(serviceName)
 	methods := req.GetMethods()
 
 	// 如果没有指定 methods，则删除整个服务（删除整个 key）

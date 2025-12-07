@@ -8,6 +8,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/roc/roc-foundation-util-go/cache"
+	"github.com/roc/roc-foundation-util-go/service_registry/discovery"
 )
 
 // Server WebSocket服务器
@@ -21,9 +22,8 @@ type Server struct {
 type ServiceContext interface {
 	GetLocalAddress() string
 	GetRedis() cache.Cache
-	GetUserConnectionKey(userID string) string
-	GetConnectionKey(connectionID string) string
 	GetFrontierConfig() *Config
+	GetDiscovery() discovery.Discovery
 }
 
 // NewServer 创建新的WebSocket服务器（从 ServiceContext 获取配置）

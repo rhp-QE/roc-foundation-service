@@ -1,10 +1,20 @@
 package frontier
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/kitex-contrib/obs-opentelemetry/tracing"
+	kitex_gen "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	backservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backservice"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 )
 
 var upgrader = websocket.Upgrader{
@@ -92,38 +102,130 @@ func (h *WebSocketHandler) HandleAuth(conn *Connection, msg *Message) error {
 // HandleMessage 处理RPC请求消息（网关模式）
 func (h *WebSocketHandler) HandleMessage(conn *Connection, msg *Message) error {
 	// 验证请求
+	if err := h.validateRequest(msg); err != nil {
+		return err
+	}
+
+	// 获取服务上下文
+	serviceCtx := h.hub.GetServiceContext()
+	if serviceCtx == nil {
+		response := NewErrorMessage(msg.RequestID, "service context not available")
+		return conn.SendMessage(response)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. 检查服务是否注册
+	if err := h.checkServiceRegistered(ctx, serviceCtx, msg); err != nil {
+		response := NewErrorMessage(msg.RequestID, err.Error())
+		return conn.SendMessage(response)
+	}
+
+	// 2. 获取服务实例并调用后端服务
+	callResp, err := h.callBackendService(ctx, serviceCtx, msg, conn)
+	if err != nil {
+		response := NewErrorMessage(msg.RequestID, err.Error())
+		return conn.SendMessage(response)
+	}
+
+	// 3. 转换响应并返回
+	response := CallResponseToFontierMessage(callResp, msg.RequestID)
+	return conn.SendMessage(response)
+}
+
+// validateRequest 验证请求消息
+func (h *WebSocketHandler) validateRequest(msg *Message) error {
 	if msg.Service == "" {
 		return ErrServiceNotFound
 	}
 	if msg.Method == "" {
 		return ErrMethodNotFound
 	}
-
-	// TODO: 这里应该根据 service 和 method 转发到后端服务
-	// 网关将 msg.Payload（业务数据）和 msg.Metadata（验证信息如token、track_id等）原样转发给后端服务
-	// response, err := h.callBackendService(msg.Service, msg.Method, msg.Payload, msg.Metadata)
-
-	// 临时实现：返回一个示例响应
-	response := NewResponseMessage(msg.RequestID)
-	return conn.SendMessage(response)
+	return nil
 }
 
-// callBackendService 调用后端服务（待实现）
-// 这里应该集成你的后端服务调用逻辑，比如：
-// - gRPC 调用
-// - HTTP/REST 调用
-// - 消息队列发送
-func (h *WebSocketHandler) callBackendService(service, method string, data map[string]interface{}) (*Message, error) {
-	// TODO: 实现实际的后端服务调用
-	// 示例：
-	// switch service {
-	// case "chat":
-	//     return h.chatService.Call(method, data)
-	// case "user":
-	//     return h.userService.Call(method, data)
-	// default:
-	//     return nil, ErrServiceNotFound
-	// }
+// callBackendService 获取服务实例并调用后端服务
+func (h *WebSocketHandler) callBackendService(ctx context.Context, serviceCtx ServiceContext, msg *Message, conn *Connection) (*kitex_gen.CallResponse, error) {
+	// 获取服务实例
+	discoveryClient := serviceCtx.GetDiscovery()
+	if discoveryClient == nil {
+		return nil, fmt.Errorf("service discovery not available")
+	}
 
-	return nil, nil
+	instance, err := discoveryClient.GetInstance(ctx, msg.Service)
+	if err != nil {
+		klog.Errorf("Failed to discover service instance for %s: %v", msg.Service, err)
+		return nil, fmt.Errorf("failed to discover service: %v", err)
+	}
+
+	hostPort := fmt.Sprintf("%s:%d", instance.Host, instance.Port)
+
+	// 创建 backservice 客户端
+	backServiceClient, err := backservice.NewClient(
+		msg.Service,
+		client.WithHostPorts(hostPort),
+		client.WithSuite(tracing.NewClientSuite()),
+		client.WithClientBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: msg.Service}),
+	)
+	if err != nil {
+		klog.Errorf("Failed to create backservice client for %s: %v", hostPort, err)
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	// 构建 CallRequest
+	callReq := MessageToCallRequest(msg, conn)
+
+	// 调用后端服务
+	callResp, err := backServiceClient.Call(ctx, callReq)
+	if err != nil {
+		klog.Errorf("Failed to call backservice %s.%s: %v", msg.Service, msg.Method, err)
+		return nil, fmt.Errorf("service call failed: %v", err)
+	}
+
+	return callResp, nil
+}
+
+// checkServiceRegistered 检查服务和方法是否已注册
+func (h *WebSocketHandler) checkServiceRegistered(ctx context.Context, serviceCtx ServiceContext, msg *Message) error {
+	// 获取 Redis 客户端
+	redisCache := serviceCtx.GetRedis()
+	if redisCache == nil {
+		return fmt.Errorf("redis is not available")
+	}
+
+	// 构建 Redis key
+	key := util.GetServiceKeyInCache(msg.Service)
+
+	// 检查服务是否存在
+	exists, err := redisCache.Exists(ctx, key)
+	if err != nil {
+		klog.Errorf("Failed to check service existence: %v", err)
+		return fmt.Errorf("failed to check service existence: %w", err)
+	}
+
+	if exists == 0 {
+		return fmt.Errorf("service %s with method %s is not registered", msg.Service, msg.Method)
+	}
+
+	// 检查 method 是否在 Set 中
+	isMember, err := redisCache.SIsMember(ctx, key, msg.Method)
+	if err != nil {
+		klog.Errorf("Failed to check method: %v", err)
+		return fmt.Errorf("failed to check method: %w", err)
+	}
+
+	// 检查是否支持所有方法（"*" 标记）
+	allMethods, err := redisCache.SIsMember(ctx, key, "*")
+	if err != nil {
+		klog.Errorf("Failed to check all methods flag: %v", err)
+		return fmt.Errorf("failed to check all methods flag: %w", err)
+	}
+
+	// 如果支持所有方法，或者指定的 method 在 Set 中，则返回 nil（已注册）
+	if allMethods || isMember {
+		return nil
+	}
+
+	return fmt.Errorf("service %s with method %s is not registered", msg.Service, msg.Method)
 }

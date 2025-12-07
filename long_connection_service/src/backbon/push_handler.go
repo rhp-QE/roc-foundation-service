@@ -13,6 +13,7 @@ import (
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
 	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 	"github.com/roc/roc-foundation-util-go/cache"
 	"github.com/roc/roc-foundation-util-go/stringutil"
 )
@@ -33,7 +34,7 @@ func (s *BackbonServiceImpl) PushData(ctx context.Context, req *kitex_gen.PushDa
 
 	// 转换消息
 	pushMsg := req.GetMessage()
-	frontierMsg := convertPushMessageToFrontierMessage(pushMsg)
+	frontierMsg := frontier.PushMessageToFrontierMessage(pushMsg)
 
 	// 广播模式处理
 	if req.GetBroadcast() {
@@ -253,7 +254,7 @@ func (s *BackbonServiceImpl) pushToRemoteMachines(
 //   - field: connectionID
 //   - value: 机器地址 (ip:port)
 func (s *BackbonServiceImpl) getUserConnectionMappings(ctx context.Context, userID string, redisCache cache.Cache) (map[string]string, error) {
-	userKey := s.getUserConnectionKey(userID)
+	userKey := util.GetUserConnectionKeyInCache(userID)
 
 	// 使用 HGetAll 获取 Hash 的所有字段和值
 	mappings, err := redisCache.HGetAll(ctx, userKey)
@@ -348,7 +349,7 @@ func (s *BackbonServiceImpl) PushToConnection(ctx context.Context, req *kitex_ge
 	}
 
 	// 转换为 frontier.Message
-	frontierMsg := convertPushMessageToFrontierMessage(pushMsg)
+	frontierMsg := frontier.PushMessageToFrontierMessage(pushMsg)
 
 	// 检查连接是否在本机
 	if s.hub != nil {
@@ -375,7 +376,7 @@ func (s *BackbonServiceImpl) PushToConnection(ctx context.Context, req *kitex_ge
 	}
 
 	// 从 Redis 获取连接所在机器地址
-	connectionKey := s.getConnectionKey(connectionID)
+	connectionKey := util.GetConnectionKeyInCache(connectionID)
 	machineAddr, err := redisCache.Get(ctx, connectionKey)
 	if err != nil || stringutil.IsEmpty(machineAddr) {
 		resp.Error = fmt.Sprintf("connection %s not found in Redis", connectionID)

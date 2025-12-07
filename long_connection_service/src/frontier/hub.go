@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 )
-
 
 // Hub 维护所有活跃的连接并处理消息分发
 type Hub struct {
@@ -43,6 +43,10 @@ type Hub struct {
 
 	// 服务上下文（可选，用于存储连接状态）
 	serviceCtx ServiceContext
+
+	// 实际的 ServiceContext 结构体（用于直接访问 Registry 和 Discovery）
+	// 通过类型断言访问实际的 ServiceContext 结构体字段
+	actualServiceCtx interface{}
 }
 
 // HubStats Hub统计信息
@@ -171,7 +175,7 @@ func (h *Hub) updateRedisOnRegister(ctx context.Context, conn *Connection) {
 	localAddress := h.serviceCtx.GetLocalAddress()
 
 	// 1. 在用户连接 Hash 中添加 connectionID -> 机器地址映射
-	userKey := h.serviceCtx.GetUserConnectionKey(conn.UserID)
+	userKey := util.GetUserConnectionKeyInCache(conn.UserID)
 	err := redis.HSet(ctx, userKey, conn.ID, localAddress)
 	if err != nil {
 		klog.Errorf("Failed to update user connection in Redis for user %s: %v", conn.UserID, err)
@@ -179,7 +183,7 @@ func (h *Hub) updateRedisOnRegister(ctx context.Context, conn *Connection) {
 	}
 
 	// 2. 在连接 key 中存储连接所在的机器地址
-	connectionKey := h.serviceCtx.GetConnectionKey(conn.ID)
+	connectionKey := util.GetConnectionKeyInCache(conn.ID)
 	err = redis.Set(ctx, connectionKey, localAddress, 24*time.Hour)
 	if err != nil {
 		klog.Errorf("Failed to set connection address in Redis for connection %s: %v", conn.ID, err)
@@ -235,14 +239,14 @@ func (h *Hub) updateRedisOnUnregister(ctx context.Context, userID, connectionID 
 	}
 
 	// 1. 从用户连接 Hash 中删除 connectionID
-	userKey := h.serviceCtx.GetUserConnectionKey(userID)
+	userKey := util.GetUserConnectionKeyInCache(userID)
 	_, err := redis.HDel(ctx, userKey, connectionID)
 	if err != nil {
 		klog.Errorf("Failed to remove connection from user hash in Redis for user %s: %v", userID, err)
 	}
 
 	// 2. 删除连接的机器地址 key
-	connectionKey := h.serviceCtx.GetConnectionKey(connectionID)
+	connectionKey := util.GetConnectionKeyInCache(connectionID)
 	err = redis.Delete(ctx, connectionKey)
 	if err != nil {
 		klog.Errorf("Failed to delete connection address from Redis for connection %s: %v", connectionID, err)
@@ -423,4 +427,14 @@ func (h *Hub) GetActiveConnectionCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.connections)
+}
+
+// GetServiceContext 获取服务上下文
+func (h *Hub) GetServiceContext() ServiceContext {
+	return h.serviceCtx
+}
+
+// GetActualServiceContext 获取实际的 ServiceContext 结构体（用于直接访问字段）
+func (h *Hub) GetActualServiceContext() interface{} {
+	return h.actualServiceCtx
 }

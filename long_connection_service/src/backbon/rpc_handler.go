@@ -19,9 +19,6 @@ type ServiceContext interface {
 	GetLocalAddress() string
 	GetRemoteClient(machineAddr string) (backbonservice.Client, error)
 	GetRedis() cache.Cache
-	GetUserConnectionKey(userID string) string
-	GetConnectionKey(connectionID string) string
-	GetServiceKey(serviceName string) string
 }
 
 // BackbonServiceImpl implements the last service interface defined in the IDL.

@@ -24,7 +24,6 @@ import (
 	"github.com/roc/roc-foundation-util-go/service_registry/loadbalancer"
 	"github.com/roc/roc-foundation-util-go/service_registry/registry"
 	"github.com/roc/roc-foundation-util-go/service_registry/registry/etcd"
-	"github.com/roc/roc-foundation-util-go/stringutil"
 )
 
 // ServiceContext 服务上下文，管理全局共享资源
@@ -247,24 +246,14 @@ func (ctx *ServiceContext) GetRemoteClient(machineAddr string) (backbonservice.C
 	return newClient, nil
 }
 
-// GetUserConnectionKey 获取用户连接 key
-func (ctx *ServiceContext) GetUserConnectionKey(userID string) string {
-	return stringutil.FormatKey("fronter", "user", "connection", userID)
-}
-
-// GetConnectionKey 获取连接 key
-func (ctx *ServiceContext) GetConnectionKey(connectionID string) string {
-	return stringutil.FormatKey("fronter", "connection", connectionID)
-}
-
-// GetServiceKey 获取服务 key
-func (ctx *ServiceContext) GetServiceKey(serviceName string) string {
-	return stringutil.FormatKey("fronter", "service", serviceName)
-}
-
 // GetFrontierConfig 获取 Frontier 配置（供 frontier 包使用）
 func (ctx *ServiceContext) GetFrontierConfig() *frontier.Config {
 	return &ctx.Config.Frontier
+}
+
+// GetDiscovery 获取服务发现实例（直接返回 Discovery 字段）
+func (ctx *ServiceContext) GetDiscovery() discovery.Discovery {
+	return ctx.Discovery
 }
 
 // Close 关闭所有资源
