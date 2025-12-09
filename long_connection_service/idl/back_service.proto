@@ -1,7 +1,7 @@
 syntax = "proto3";
-package backservice;
+package back;
 
-option go_package = "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen";
+option go_package = "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/back";
 
 // CallRequest 网关调用后端服务的请求
 // 网关接收到客户端请求后，将请求转发给对应的后端服务

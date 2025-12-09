@@ -1,7 +1,7 @@
 syntax = "proto3";
-package backbonservice;
+package backbon;
 
-option go_package = "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen";
+option go_package = "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon";
 
 // CheckUserOnlineReq 检查用户在线状态请求
 message CheckUserOnlineReq {

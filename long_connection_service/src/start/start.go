@@ -24,7 +24,7 @@ import (
 	"github.com/roc/roc-foundation-util-go/network"
 	foundationregistry "github.com/roc/roc-foundation-util-go/service_registry/registry"
 
-	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbonservice"
+	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	backbonImpl "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/backbon"
 	frontier "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/servicecontext"

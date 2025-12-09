@@ -10,8 +10,8 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
-	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbonservice"
+	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
+	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 	"github.com/roc/roc-foundation-util-go/cache"
@@ -20,11 +20,11 @@ import (
 
 // PushData implements the BackbonServiceImpl interface.
 // 推送数据到用户：先检查连接是否在本机，如果在本机直接推送，否则调用远程 BackbonService
-func (s *BackbonServiceImpl) PushData(ctx context.Context, req *kitex_gen.PushDataReq) (resp *kitex_gen.PushDataResp, err error) {
-	resp = &kitex_gen.PushDataResp{
+func (s *BackbonServiceImpl) PushData(ctx context.Context, req *backbon.PushDataReq) (resp *backbon.PushDataResp, err error) {
+	resp = &backbon.PushDataResp{
 		SuccessCount: 0,
 		FailCount:    0,
-		Results:      []*kitex_gen.PushResult{},
+		Results:      []*backbon.PushResult{},
 	}
 
 	// 验证请求
@@ -49,11 +49,11 @@ func (s *BackbonServiceImpl) PushData(ctx context.Context, req *kitex_gen.PushDa
 }
 
 // validatePushRequest 验证推送请求
-func (s *BackbonServiceImpl) validatePushRequest(req *kitex_gen.PushDataReq, resp *kitex_gen.PushDataResp) error {
+func (s *BackbonServiceImpl) validatePushRequest(req *backbon.PushDataReq, resp *backbon.PushDataResp) error {
 	pushMsg := req.GetMessage()
 	if pushMsg == nil {
 		resp.FailCount = 1
-		resp.Results = append(resp.Results, &kitex_gen.PushResult{
+		resp.Results = append(resp.Results, &backbon.PushResult{
 			Success: false,
 			Error:   "message is required",
 		})
@@ -63,7 +63,7 @@ func (s *BackbonServiceImpl) validatePushRequest(req *kitex_gen.PushDataReq, res
 	// 非广播模式需要用户ID列表
 	if !req.GetBroadcast() && len(req.GetUserIDs()) == 0 {
 		resp.FailCount++
-		resp.Results = append(resp.Results, &kitex_gen.PushResult{
+		resp.Results = append(resp.Results, &backbon.PushResult{
 			Success: false,
 			Error:   "userIDs is required when broadcast is false",
 		})
@@ -74,10 +74,10 @@ func (s *BackbonServiceImpl) validatePushRequest(req *kitex_gen.PushDataReq, res
 }
 
 // handleBroadcast 处理广播模式
-func (s *BackbonServiceImpl) handleBroadcast(frontierMsg *frontier.Message, resp *kitex_gen.PushDataResp) {
+func (s *BackbonServiceImpl) handleBroadcast(frontierMsg *frontier.Message, resp *backbon.PushDataResp) {
 	if s.hub == nil {
 		resp.FailCount++
-		resp.Results = append(resp.Results, &kitex_gen.PushResult{
+		resp.Results = append(resp.Results, &backbon.PushResult{
 			Success: false,
 			Error:   "hub is not available",
 		})
@@ -93,9 +93,9 @@ func (s *BackbonServiceImpl) handleBroadcast(frontierMsg *frontier.Message, resp
 func (s *BackbonServiceImpl) pushToUsers(
 	ctx context.Context,
 	userIDs []string,
-	pushMsg *kitex_gen.PushMessage,
+	pushMsg *backbon.PushMessage,
 	frontierMsg *frontier.Message,
-	resp *kitex_gen.PushDataResp,
+	resp *backbon.PushDataResp,
 ) {
 	localAddr := s.serviceCtx.GetLocalAddress()
 
@@ -118,11 +118,11 @@ func (s *BackbonServiceImpl) pushToUsers(
 func (s *BackbonServiceImpl) pushToUser(
 	ctx context.Context,
 	userID string,
-	pushMsg *kitex_gen.PushMessage,
+	pushMsg *backbon.PushMessage,
 	frontierMsg *frontier.Message,
 	localAddr string,
-) *kitex_gen.PushResult {
-	result := &kitex_gen.PushResult{
+) *backbon.PushResult {
+	result := &backbon.PushResult{
 		UserID:  userID,
 		Success: false,
 	}
@@ -170,7 +170,7 @@ func (s *BackbonServiceImpl) pushToUser(
 func (s *BackbonServiceImpl) tryPushToLocalUser(
 	userID string,
 	frontierMsg *frontier.Message,
-) *kitex_gen.PushResult {
+) *backbon.PushResult {
 	if s.hub == nil {
 		return nil
 	}
@@ -181,7 +181,7 @@ func (s *BackbonServiceImpl) tryPushToLocalUser(
 	}
 
 	// 连接在本机，直接推送
-	result := &kitex_gen.PushResult{
+	result := &backbon.PushResult{
 		UserID:  userID,
 		Success: false,
 	}
@@ -203,13 +203,13 @@ func (s *BackbonServiceImpl) tryPushToLocalUser(
 func (s *BackbonServiceImpl) pushToRemoteMachines(
 	ctx context.Context,
 	userID string,
-	pushMsg *kitex_gen.PushMessage,
+	pushMsg *backbon.PushMessage,
 	localAddr string,
-) []*kitex_gen.PushResult {
+) []*backbon.PushResult {
 	// 获取 Redis 客户端
 	redisCache := s.serviceCtx.GetRedis()
 	if redisCache == nil {
-		return []*kitex_gen.PushResult{{
+		return []*backbon.PushResult{{
 			UserID:  userID,
 			Success: false,
 			Error:   "Redis is not available",
@@ -220,7 +220,7 @@ func (s *BackbonServiceImpl) pushToRemoteMachines(
 	connectionMappings, err := s.getUserConnectionMappings(ctx, userID, redisCache)
 	if err != nil {
 		klog.Warnf("User %s connection mappings not found in Redis: %v", userID, err)
-		return []*kitex_gen.PushResult{{
+		return []*backbon.PushResult{{
 			UserID:  userID,
 			Success: false,
 			Error:   fmt.Sprintf("user %s connection mappings not found in Redis: %v", userID, err),
@@ -228,18 +228,18 @@ func (s *BackbonServiceImpl) pushToRemoteMachines(
 	}
 
 	if len(connectionMappings) == 0 {
-		return []*kitex_gen.PushResult{}
+		return []*backbon.PushResult{}
 	}
 
 	// 遍历所有连接进行推送
-	results := make([]*kitex_gen.PushResult, 0, len(connectionMappings))
+	results := make([]*backbon.PushResult, 0, len(connectionMappings))
 	for connectionID, machineAddr := range connectionMappings {
 		// 跳过本机地址（本机已经在 tryPushToLocalUser 中处理）
 		if machineAddr == localAddr {
 			continue
 		}
 
-		result := s.callRemotePushToConnection(ctx, connectionID, pushMsg, machineAddr, &kitex_gen.PushResult{
+		result := s.callRemotePushToConnection(ctx, connectionID, pushMsg, machineAddr, &backbon.PushResult{
 			UserID:  userID,
 			Success: false,
 		})
@@ -281,10 +281,10 @@ func (s *BackbonServiceImpl) getUserConnectionMappings(ctx context.Context, user
 func (s *BackbonServiceImpl) callRemotePushToConnection(
 	ctx context.Context,
 	connectionID string,
-	pushMsg *kitex_gen.PushMessage,
+	pushMsg *backbon.PushMessage,
 	machineAddr string,
-	result *kitex_gen.PushResult,
-) *kitex_gen.PushResult {
+	result *backbon.PushResult,
+) *backbon.PushResult {
 	// 创建远程客户端
 	remoteClient, err := s.createRemoteClient(machineAddr)
 	if err != nil {
@@ -294,7 +294,7 @@ func (s *BackbonServiceImpl) callRemotePushToConnection(
 	}
 
 	// 构建远程推送请求（使用 PushToConnection）
-	remoteReq := &kitex_gen.PushToConnectionReq{
+	remoteReq := &backbon.PushToConnectionReq{
 		ConnectionID: connectionID,
 		Message:      pushMsg,
 	}
@@ -330,8 +330,8 @@ func (s *BackbonServiceImpl) createRemoteClient(machineAddr string) (backbonserv
 
 // PushToConnection implements the BackbonServiceImpl interface.
 // 向指定连接推送消息：检查连接是否在本机，如果在本机直接推送，否则从 Redis 查找并调用远程服务
-func (s *BackbonServiceImpl) PushToConnection(ctx context.Context, req *kitex_gen.PushToConnectionReq) (resp *kitex_gen.PushToConnectionResp, err error) {
-	resp = &kitex_gen.PushToConnectionResp{
+func (s *BackbonServiceImpl) PushToConnection(ctx context.Context, req *backbon.PushToConnectionReq) (resp *backbon.PushToConnectionResp, err error) {
+	resp = &backbon.PushToConnectionResp{
 		Success: false,
 	}
 
@@ -392,10 +392,10 @@ func (s *BackbonServiceImpl) PushToConnection(ctx context.Context, req *kitex_ge
 func (s *BackbonServiceImpl) callRemotePushToConnectionFromLocal(
 	ctx context.Context,
 	connectionID string,
-	pushMsg *kitex_gen.PushMessage,
+	pushMsg *backbon.PushMessage,
 	machineAddr string,
-) (*kitex_gen.PushToConnectionResp, error) {
-	resp := &kitex_gen.PushToConnectionResp{
+) (*backbon.PushToConnectionResp, error) {
+	resp := &backbon.PushToConnectionResp{
 		Success: false,
 	}
 
@@ -408,7 +408,7 @@ func (s *BackbonServiceImpl) callRemotePushToConnectionFromLocal(
 	}
 
 	// 构建远程推送请求
-	remoteReq := &kitex_gen.PushToConnectionReq{
+	remoteReq := &backbon.PushToConnectionReq{
 		ConnectionID: connectionID,
 		Message:      pushMsg,
 	}

@@ -9,7 +9,7 @@ import (
 	kitex "github.com/cloudwego/kitex/pkg/serviceinfo"
 	streaming "github.com/cloudwego/kitex/pkg/streaming"
 	proto "github.com/cloudwego/prutal"
-	kitex_gen "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	back "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/back"
 )
 
 var errInvalidMessageType = errors.New("invalid message type for service method handler")
@@ -60,7 +60,7 @@ func NewServiceInfoForStreamClient() *kitex.ServiceInfo {
 
 func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreamingMethods bool) *kitex.ServiceInfo {
 	serviceName := "BackService"
-	handlerType := (*kitex_gen.BackService)(nil)
+	handlerType := (*back.BackService)(nil)
 	methods := map[string]kitex.MethodInfo{}
 	for name, m := range serviceMethods {
 		if m.IsStreaming() && !keepStreamingMethods {
@@ -72,7 +72,7 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 		methods[name] = m
 	}
 	extra := map[string]interface{}{
-		"PackageName": "backservice",
+		"PackageName": "back",
 	}
 	if hasStreaming {
 		extra["streaming"] = hasStreaming
@@ -92,17 +92,17 @@ func callHandler(ctx context.Context, handler interface{}, arg, result interface
 	switch s := arg.(type) {
 	case *streaming.Args:
 		st := s.Stream
-		req := new(kitex_gen.CallRequest)
+		req := new(back.CallRequest)
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.(kitex_gen.BackService).Call(ctx, req)
+		resp, err := handler.(back.BackService).Call(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *CallArgs:
-		success, err := handler.(kitex_gen.BackService).Call(ctx, s.Req)
+		success, err := handler.(back.BackService).Call(ctx, s.Req)
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func newCallResult() interface{} {
 }
 
 type CallArgs struct {
-	Req *kitex_gen.CallRequest
+	Req *back.CallRequest
 }
 
 func (p *CallArgs) Marshal(out []byte) ([]byte, error) {
@@ -133,7 +133,7 @@ func (p *CallArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *CallArgs) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.CallRequest)
+	msg := new(back.CallRequest)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -141,9 +141,9 @@ func (p *CallArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var CallArgs_Req_DEFAULT *kitex_gen.CallRequest
+var CallArgs_Req_DEFAULT *back.CallRequest
 
-func (p *CallArgs) GetReq() *kitex_gen.CallRequest {
+func (p *CallArgs) GetReq() *back.CallRequest {
 	if !p.IsSetReq() {
 		return CallArgs_Req_DEFAULT
 	}
@@ -159,10 +159,10 @@ func (p *CallArgs) GetFirstArgument() interface{} {
 }
 
 type CallResult struct {
-	Success *kitex_gen.CallResponse
+	Success *back.CallResponse
 }
 
-var CallResult_Success_DEFAULT *kitex_gen.CallResponse
+var CallResult_Success_DEFAULT *back.CallResponse
 
 func (p *CallResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -172,7 +172,7 @@ func (p *CallResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *CallResult) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.CallResponse)
+	msg := new(back.CallResponse)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func (p *CallResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *CallResult) GetSuccess() *kitex_gen.CallResponse {
+func (p *CallResult) GetSuccess() *back.CallResponse {
 	if !p.IsSetSuccess() {
 		return CallResult_Success_DEFAULT
 	}
@@ -188,7 +188,7 @@ func (p *CallResult) GetSuccess() *kitex_gen.CallResponse {
 }
 
 func (p *CallResult) SetSuccess(x interface{}) {
-	p.Success = x.(*kitex_gen.CallResponse)
+	p.Success = x.(*back.CallResponse)
 }
 
 func (p *CallResult) IsSetSuccess() bool {
@@ -209,7 +209,7 @@ func newServiceClient(c client.Client) *kClient {
 	}
 }
 
-func (p *kClient) Call(ctx context.Context, Req *kitex_gen.CallRequest) (r *kitex_gen.CallResponse, err error) {
+func (p *kClient) Call(ctx context.Context, Req *back.CallRequest) (r *back.CallResponse, err error) {
 	var _args CallArgs
 	_args.Req = Req
 	var _result CallResult

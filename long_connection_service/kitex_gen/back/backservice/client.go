@@ -6,12 +6,12 @@ import (
 	"context"
 	client "github.com/cloudwego/kitex/client"
 	callopt "github.com/cloudwego/kitex/client/callopt"
-	kitex_gen "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	back "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/back"
 )
 
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
-	Call(ctx context.Context, Req *kitex_gen.CallRequest, callOptions ...callopt.Option) (r *kitex_gen.CallResponse, err error)
+	Call(ctx context.Context, Req *back.CallRequest, callOptions ...callopt.Option) (r *back.CallResponse, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -43,7 +43,7 @@ type kBackServiceClient struct {
 	*kClient
 }
 
-func (p *kBackServiceClient) Call(ctx context.Context, Req *kitex_gen.CallRequest, callOptions ...callopt.Option) (r *kitex_gen.CallResponse, err error) {
+func (p *kBackServiceClient) Call(ctx context.Context, Req *back.CallRequest, callOptions ...callopt.Option) (r *back.CallResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Call(ctx, Req)
 }

@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/kitex-contrib/obs-opentelemetry/tracing"
-	kitex_gen "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
-	backservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backservice"
+	back "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/back"
+	backservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/back/backservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 )
 
@@ -146,7 +146,7 @@ func (h *WebSocketHandler) validateRequest(msg *Message) error {
 }
 
 // callBackendService 获取服务实例并调用后端服务
-func (h *WebSocketHandler) callBackendService(ctx context.Context, serviceCtx ServiceContext, msg *Message, conn *Connection) (*kitex_gen.CallResponse, error) {
+func (h *WebSocketHandler) callBackendService(ctx context.Context, serviceCtx ServiceContext, msg *Message, conn *Connection) (*back.CallResponse, error) {
 	// 获取服务实例
 	discoveryClient := serviceCtx.GetDiscovery()
 	if discoveryClient == nil {

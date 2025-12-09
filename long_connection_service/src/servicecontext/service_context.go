@@ -15,7 +15,7 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/google/uuid"
-	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbonservice"
+	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/config"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
 	"github.com/roc/roc-foundation-util-go/cache"

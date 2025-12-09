@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 	"github.com/roc/roc-foundation-util-go/stringutil"
 )
@@ -19,8 +19,8 @@ import (
 // RegisterService implements the BackbonServiceImpl interface.
 // 向 redis 内写入 service 和 method 的映射关系
 // 使用 Set 结构: key = "fronter:service:{serviceName}", members = {method1, method2, ...}
-func (s *BackbonServiceImpl) RegisterService(ctx context.Context, req *kitex_gen.RegisterServiceReq) (resp *kitex_gen.RegisterServiceResp, err error) {
-	resp = &kitex_gen.RegisterServiceResp{
+func (s *BackbonServiceImpl) RegisterService(ctx context.Context, req *backbon.RegisterServiceReq) (resp *backbon.RegisterServiceResp, err error) {
+	resp = &backbon.RegisterServiceResp{
 		Success: false,
 	}
 
@@ -81,8 +81,8 @@ func (s *BackbonServiceImpl) RegisterService(ctx context.Context, req *kitex_gen
 
 // UnregisterService implements the BackbonServiceImpl interface.
 // 销毁 redis 内 service 和 method 的映射关系
-func (s *BackbonServiceImpl) UnregisterService(ctx context.Context, req *kitex_gen.UnregisterServiceReq) (resp *kitex_gen.UnregisterServiceResp, err error) {
-	resp = &kitex_gen.UnregisterServiceResp{
+func (s *BackbonServiceImpl) UnregisterService(ctx context.Context, req *backbon.UnregisterServiceReq) (resp *backbon.UnregisterServiceResp, err error) {
+	resp = &backbon.UnregisterServiceResp{
 		Success: false,
 	}
 
@@ -143,7 +143,7 @@ func (s *BackbonServiceImpl) UnregisterService(ctx context.Context, req *kitex_g
 }
 
 // GetService implements the BackbonServiceImpl interface.
-func (s *BackbonServiceImpl) GetService(ctx context.Context, req *kitex_gen.GetServiceReq) (resp *kitex_gen.GetServiceResp, err error) {
+func (s *BackbonServiceImpl) GetService(ctx context.Context, req *backbon.GetServiceReq) (resp *backbon.GetServiceResp, err error) {
 	// TODO: Your code here...
 	return
 }

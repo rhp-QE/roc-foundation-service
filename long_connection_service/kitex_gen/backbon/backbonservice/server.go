@@ -3,11 +3,11 @@ package backbonservice
 
 import (
 	server "github.com/cloudwego/kitex/server"
-	kitex_gen "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
 )
 
 // NewServer creates a server.Server with the given handler and options.
-func NewServer(handler kitex_gen.BackbonService, opts ...server.Option) server.Server {
+func NewServer(handler backbon.BackbonService, opts ...server.Option) server.Server {
 	var options []server.Option
 
 	options = append(options, opts...)
@@ -19,6 +19,6 @@ func NewServer(handler kitex_gen.BackbonService, opts ...server.Option) server.S
 	return svr
 }
 
-func RegisterService(svr server.Server, handler kitex_gen.BackbonService, opts ...server.RegisterOption) error {
+func RegisterService(svr server.Server, handler backbon.BackbonService, opts ...server.RegisterOption) error {
 	return svr.RegisterService(serviceInfo(), handler, opts...)
 }

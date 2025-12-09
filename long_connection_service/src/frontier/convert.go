@@ -8,11 +8,12 @@ package frontier
 import (
 	"time"
 
-	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	back "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/back"
+	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
 )
 
 // PushMessageToFrontierMessage 将 PushMessage 转换为 frontier.Message
-func PushMessageToFrontierMessage(pushMsg *kitex_gen.PushMessage) *Message {
+func PushMessageToFrontierMessage(pushMsg *backbon.PushMessage) *Message {
 	msg := NewMessage(MessageTypePush)
 	if pushMsg != nil {
 		msg.RequestID = pushMsg.GetRequestID()
@@ -37,7 +38,7 @@ func PushMessageToFrontierMessage(pushMsg *kitex_gen.PushMessage) *Message {
 }
 
 // CallResponseToFontierMessage 将 CallResponse 转换为 frontier.Message
-func CallResponseToFontierMessage(callResp *kitex_gen.CallResponse, requestID string) *Message {
+func CallResponseToFontierMessage(callResp *back.CallResponse, requestID string) *Message {
 	response := &Message{
 		RequestID: callResp.GetRequestID(),
 		Type:      callResp.GetType(),
@@ -55,8 +56,8 @@ func CallResponseToFontierMessage(callResp *kitex_gen.CallResponse, requestID st
 }
 
 // MessageToCallRequest 将 frontier.Message 和 Connection 转换为 CallRequest
-func MessageToCallRequest(msg *Message, conn *Connection) *kitex_gen.CallRequest {
-	return &kitex_gen.CallRequest{
+func MessageToCallRequest(msg *Message, conn *Connection) *back.CallRequest {
+	return &back.CallRequest{
 		RequestID:    msg.RequestID,
 		Type:         msg.Type,
 		Service:      msg.Service,

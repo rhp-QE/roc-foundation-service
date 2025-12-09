@@ -9,7 +9,7 @@ import (
 	kitex "github.com/cloudwego/kitex/pkg/serviceinfo"
 	streaming "github.com/cloudwego/kitex/pkg/streaming"
 	proto "github.com/cloudwego/prutal"
-	kitex_gen "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
+	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
 )
 
 var errInvalidMessageType = errors.New("invalid message type for service method handler")
@@ -95,7 +95,7 @@ func NewServiceInfoForStreamClient() *kitex.ServiceInfo {
 
 func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreamingMethods bool) *kitex.ServiceInfo {
 	serviceName := "BackbonService"
-	handlerType := (*kitex_gen.BackbonService)(nil)
+	handlerType := (*backbon.BackbonService)(nil)
 	methods := map[string]kitex.MethodInfo{}
 	for name, m := range serviceMethods {
 		if m.IsStreaming() && !keepStreamingMethods {
@@ -107,7 +107,7 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 		methods[name] = m
 	}
 	extra := map[string]interface{}{
-		"PackageName": "backbonservice",
+		"PackageName": "backbon",
 	}
 	if hasStreaming {
 		extra["streaming"] = hasStreaming
@@ -127,17 +127,17 @@ func checkUserOnlineHandler(ctx context.Context, handler interface{}, arg, resul
 	switch s := arg.(type) {
 	case *streaming.Args:
 		st := s.Stream
-		req := new(kitex_gen.CheckUserOnlineReq)
+		req := new(backbon.CheckUserOnlineReq)
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.(kitex_gen.BackbonService).CheckUserOnline(ctx, req)
+		resp, err := handler.(backbon.BackbonService).CheckUserOnline(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *CheckUserOnlineArgs:
-		success, err := handler.(kitex_gen.BackbonService).CheckUserOnline(ctx, s.Req)
+		success, err := handler.(backbon.BackbonService).CheckUserOnline(ctx, s.Req)
 		if err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func newCheckUserOnlineResult() interface{} {
 }
 
 type CheckUserOnlineArgs struct {
-	Req *kitex_gen.CheckUserOnlineReq
+	Req *backbon.CheckUserOnlineReq
 }
 
 func (p *CheckUserOnlineArgs) Marshal(out []byte) ([]byte, error) {
@@ -168,7 +168,7 @@ func (p *CheckUserOnlineArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *CheckUserOnlineArgs) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.CheckUserOnlineReq)
+	msg := new(backbon.CheckUserOnlineReq)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -176,9 +176,9 @@ func (p *CheckUserOnlineArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var CheckUserOnlineArgs_Req_DEFAULT *kitex_gen.CheckUserOnlineReq
+var CheckUserOnlineArgs_Req_DEFAULT *backbon.CheckUserOnlineReq
 
-func (p *CheckUserOnlineArgs) GetReq() *kitex_gen.CheckUserOnlineReq {
+func (p *CheckUserOnlineArgs) GetReq() *backbon.CheckUserOnlineReq {
 	if !p.IsSetReq() {
 		return CheckUserOnlineArgs_Req_DEFAULT
 	}
@@ -194,10 +194,10 @@ func (p *CheckUserOnlineArgs) GetFirstArgument() interface{} {
 }
 
 type CheckUserOnlineResult struct {
-	Success *kitex_gen.CheckUserOnlineResp
+	Success *backbon.CheckUserOnlineResp
 }
 
-var CheckUserOnlineResult_Success_DEFAULT *kitex_gen.CheckUserOnlineResp
+var CheckUserOnlineResult_Success_DEFAULT *backbon.CheckUserOnlineResp
 
 func (p *CheckUserOnlineResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -207,7 +207,7 @@ func (p *CheckUserOnlineResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *CheckUserOnlineResult) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.CheckUserOnlineResp)
+	msg := new(backbon.CheckUserOnlineResp)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (p *CheckUserOnlineResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *CheckUserOnlineResult) GetSuccess() *kitex_gen.CheckUserOnlineResp {
+func (p *CheckUserOnlineResult) GetSuccess() *backbon.CheckUserOnlineResp {
 	if !p.IsSetSuccess() {
 		return CheckUserOnlineResult_Success_DEFAULT
 	}
@@ -223,7 +223,7 @@ func (p *CheckUserOnlineResult) GetSuccess() *kitex_gen.CheckUserOnlineResp {
 }
 
 func (p *CheckUserOnlineResult) SetSuccess(x interface{}) {
-	p.Success = x.(*kitex_gen.CheckUserOnlineResp)
+	p.Success = x.(*backbon.CheckUserOnlineResp)
 }
 
 func (p *CheckUserOnlineResult) IsSetSuccess() bool {
@@ -238,17 +238,17 @@ func pushDataHandler(ctx context.Context, handler interface{}, arg, result inter
 	switch s := arg.(type) {
 	case *streaming.Args:
 		st := s.Stream
-		req := new(kitex_gen.PushDataReq)
+		req := new(backbon.PushDataReq)
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.(kitex_gen.BackbonService).PushData(ctx, req)
+		resp, err := handler.(backbon.BackbonService).PushData(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *PushDataArgs:
-		success, err := handler.(kitex_gen.BackbonService).PushData(ctx, s.Req)
+		success, err := handler.(backbon.BackbonService).PushData(ctx, s.Req)
 		if err != nil {
 			return err
 		}
@@ -268,7 +268,7 @@ func newPushDataResult() interface{} {
 }
 
 type PushDataArgs struct {
-	Req *kitex_gen.PushDataReq
+	Req *backbon.PushDataReq
 }
 
 func (p *PushDataArgs) Marshal(out []byte) ([]byte, error) {
@@ -279,7 +279,7 @@ func (p *PushDataArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *PushDataArgs) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.PushDataReq)
+	msg := new(backbon.PushDataReq)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -287,9 +287,9 @@ func (p *PushDataArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var PushDataArgs_Req_DEFAULT *kitex_gen.PushDataReq
+var PushDataArgs_Req_DEFAULT *backbon.PushDataReq
 
-func (p *PushDataArgs) GetReq() *kitex_gen.PushDataReq {
+func (p *PushDataArgs) GetReq() *backbon.PushDataReq {
 	if !p.IsSetReq() {
 		return PushDataArgs_Req_DEFAULT
 	}
@@ -305,10 +305,10 @@ func (p *PushDataArgs) GetFirstArgument() interface{} {
 }
 
 type PushDataResult struct {
-	Success *kitex_gen.PushDataResp
+	Success *backbon.PushDataResp
 }
 
-var PushDataResult_Success_DEFAULT *kitex_gen.PushDataResp
+var PushDataResult_Success_DEFAULT *backbon.PushDataResp
 
 func (p *PushDataResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -318,7 +318,7 @@ func (p *PushDataResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *PushDataResult) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.PushDataResp)
+	msg := new(backbon.PushDataResp)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func (p *PushDataResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *PushDataResult) GetSuccess() *kitex_gen.PushDataResp {
+func (p *PushDataResult) GetSuccess() *backbon.PushDataResp {
 	if !p.IsSetSuccess() {
 		return PushDataResult_Success_DEFAULT
 	}
@@ -334,7 +334,7 @@ func (p *PushDataResult) GetSuccess() *kitex_gen.PushDataResp {
 }
 
 func (p *PushDataResult) SetSuccess(x interface{}) {
-	p.Success = x.(*kitex_gen.PushDataResp)
+	p.Success = x.(*backbon.PushDataResp)
 }
 
 func (p *PushDataResult) IsSetSuccess() bool {
@@ -349,17 +349,17 @@ func pushToConnectionHandler(ctx context.Context, handler interface{}, arg, resu
 	switch s := arg.(type) {
 	case *streaming.Args:
 		st := s.Stream
-		req := new(kitex_gen.PushToConnectionReq)
+		req := new(backbon.PushToConnectionReq)
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.(kitex_gen.BackbonService).PushToConnection(ctx, req)
+		resp, err := handler.(backbon.BackbonService).PushToConnection(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *PushToConnectionArgs:
-		success, err := handler.(kitex_gen.BackbonService).PushToConnection(ctx, s.Req)
+		success, err := handler.(backbon.BackbonService).PushToConnection(ctx, s.Req)
 		if err != nil {
 			return err
 		}
@@ -379,7 +379,7 @@ func newPushToConnectionResult() interface{} {
 }
 
 type PushToConnectionArgs struct {
-	Req *kitex_gen.PushToConnectionReq
+	Req *backbon.PushToConnectionReq
 }
 
 func (p *PushToConnectionArgs) Marshal(out []byte) ([]byte, error) {
@@ -390,7 +390,7 @@ func (p *PushToConnectionArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *PushToConnectionArgs) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.PushToConnectionReq)
+	msg := new(backbon.PushToConnectionReq)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -398,9 +398,9 @@ func (p *PushToConnectionArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var PushToConnectionArgs_Req_DEFAULT *kitex_gen.PushToConnectionReq
+var PushToConnectionArgs_Req_DEFAULT *backbon.PushToConnectionReq
 
-func (p *PushToConnectionArgs) GetReq() *kitex_gen.PushToConnectionReq {
+func (p *PushToConnectionArgs) GetReq() *backbon.PushToConnectionReq {
 	if !p.IsSetReq() {
 		return PushToConnectionArgs_Req_DEFAULT
 	}
@@ -416,10 +416,10 @@ func (p *PushToConnectionArgs) GetFirstArgument() interface{} {
 }
 
 type PushToConnectionResult struct {
-	Success *kitex_gen.PushToConnectionResp
+	Success *backbon.PushToConnectionResp
 }
 
-var PushToConnectionResult_Success_DEFAULT *kitex_gen.PushToConnectionResp
+var PushToConnectionResult_Success_DEFAULT *backbon.PushToConnectionResp
 
 func (p *PushToConnectionResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -429,7 +429,7 @@ func (p *PushToConnectionResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *PushToConnectionResult) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.PushToConnectionResp)
+	msg := new(backbon.PushToConnectionResp)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func (p *PushToConnectionResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *PushToConnectionResult) GetSuccess() *kitex_gen.PushToConnectionResp {
+func (p *PushToConnectionResult) GetSuccess() *backbon.PushToConnectionResp {
 	if !p.IsSetSuccess() {
 		return PushToConnectionResult_Success_DEFAULT
 	}
@@ -445,7 +445,7 @@ func (p *PushToConnectionResult) GetSuccess() *kitex_gen.PushToConnectionResp {
 }
 
 func (p *PushToConnectionResult) SetSuccess(x interface{}) {
-	p.Success = x.(*kitex_gen.PushToConnectionResp)
+	p.Success = x.(*backbon.PushToConnectionResp)
 }
 
 func (p *PushToConnectionResult) IsSetSuccess() bool {
@@ -460,17 +460,17 @@ func registerServiceHandler(ctx context.Context, handler interface{}, arg, resul
 	switch s := arg.(type) {
 	case *streaming.Args:
 		st := s.Stream
-		req := new(kitex_gen.RegisterServiceReq)
+		req := new(backbon.RegisterServiceReq)
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.(kitex_gen.BackbonService).RegisterService(ctx, req)
+		resp, err := handler.(backbon.BackbonService).RegisterService(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *RegisterServiceArgs:
-		success, err := handler.(kitex_gen.BackbonService).RegisterService(ctx, s.Req)
+		success, err := handler.(backbon.BackbonService).RegisterService(ctx, s.Req)
 		if err != nil {
 			return err
 		}
@@ -490,7 +490,7 @@ func newRegisterServiceResult() interface{} {
 }
 
 type RegisterServiceArgs struct {
-	Req *kitex_gen.RegisterServiceReq
+	Req *backbon.RegisterServiceReq
 }
 
 func (p *RegisterServiceArgs) Marshal(out []byte) ([]byte, error) {
@@ -501,7 +501,7 @@ func (p *RegisterServiceArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *RegisterServiceArgs) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.RegisterServiceReq)
+	msg := new(backbon.RegisterServiceReq)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -509,9 +509,9 @@ func (p *RegisterServiceArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var RegisterServiceArgs_Req_DEFAULT *kitex_gen.RegisterServiceReq
+var RegisterServiceArgs_Req_DEFAULT *backbon.RegisterServiceReq
 
-func (p *RegisterServiceArgs) GetReq() *kitex_gen.RegisterServiceReq {
+func (p *RegisterServiceArgs) GetReq() *backbon.RegisterServiceReq {
 	if !p.IsSetReq() {
 		return RegisterServiceArgs_Req_DEFAULT
 	}
@@ -527,10 +527,10 @@ func (p *RegisterServiceArgs) GetFirstArgument() interface{} {
 }
 
 type RegisterServiceResult struct {
-	Success *kitex_gen.RegisterServiceResp
+	Success *backbon.RegisterServiceResp
 }
 
-var RegisterServiceResult_Success_DEFAULT *kitex_gen.RegisterServiceResp
+var RegisterServiceResult_Success_DEFAULT *backbon.RegisterServiceResp
 
 func (p *RegisterServiceResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -540,7 +540,7 @@ func (p *RegisterServiceResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *RegisterServiceResult) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.RegisterServiceResp)
+	msg := new(backbon.RegisterServiceResp)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -548,7 +548,7 @@ func (p *RegisterServiceResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *RegisterServiceResult) GetSuccess() *kitex_gen.RegisterServiceResp {
+func (p *RegisterServiceResult) GetSuccess() *backbon.RegisterServiceResp {
 	if !p.IsSetSuccess() {
 		return RegisterServiceResult_Success_DEFAULT
 	}
@@ -556,7 +556,7 @@ func (p *RegisterServiceResult) GetSuccess() *kitex_gen.RegisterServiceResp {
 }
 
 func (p *RegisterServiceResult) SetSuccess(x interface{}) {
-	p.Success = x.(*kitex_gen.RegisterServiceResp)
+	p.Success = x.(*backbon.RegisterServiceResp)
 }
 
 func (p *RegisterServiceResult) IsSetSuccess() bool {
@@ -571,17 +571,17 @@ func unregisterServiceHandler(ctx context.Context, handler interface{}, arg, res
 	switch s := arg.(type) {
 	case *streaming.Args:
 		st := s.Stream
-		req := new(kitex_gen.UnregisterServiceReq)
+		req := new(backbon.UnregisterServiceReq)
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.(kitex_gen.BackbonService).UnregisterService(ctx, req)
+		resp, err := handler.(backbon.BackbonService).UnregisterService(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *UnregisterServiceArgs:
-		success, err := handler.(kitex_gen.BackbonService).UnregisterService(ctx, s.Req)
+		success, err := handler.(backbon.BackbonService).UnregisterService(ctx, s.Req)
 		if err != nil {
 			return err
 		}
@@ -601,7 +601,7 @@ func newUnregisterServiceResult() interface{} {
 }
 
 type UnregisterServiceArgs struct {
-	Req *kitex_gen.UnregisterServiceReq
+	Req *backbon.UnregisterServiceReq
 }
 
 func (p *UnregisterServiceArgs) Marshal(out []byte) ([]byte, error) {
@@ -612,7 +612,7 @@ func (p *UnregisterServiceArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *UnregisterServiceArgs) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.UnregisterServiceReq)
+	msg := new(backbon.UnregisterServiceReq)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -620,9 +620,9 @@ func (p *UnregisterServiceArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var UnregisterServiceArgs_Req_DEFAULT *kitex_gen.UnregisterServiceReq
+var UnregisterServiceArgs_Req_DEFAULT *backbon.UnregisterServiceReq
 
-func (p *UnregisterServiceArgs) GetReq() *kitex_gen.UnregisterServiceReq {
+func (p *UnregisterServiceArgs) GetReq() *backbon.UnregisterServiceReq {
 	if !p.IsSetReq() {
 		return UnregisterServiceArgs_Req_DEFAULT
 	}
@@ -638,10 +638,10 @@ func (p *UnregisterServiceArgs) GetFirstArgument() interface{} {
 }
 
 type UnregisterServiceResult struct {
-	Success *kitex_gen.UnregisterServiceResp
+	Success *backbon.UnregisterServiceResp
 }
 
-var UnregisterServiceResult_Success_DEFAULT *kitex_gen.UnregisterServiceResp
+var UnregisterServiceResult_Success_DEFAULT *backbon.UnregisterServiceResp
 
 func (p *UnregisterServiceResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -651,7 +651,7 @@ func (p *UnregisterServiceResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *UnregisterServiceResult) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.UnregisterServiceResp)
+	msg := new(backbon.UnregisterServiceResp)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -659,7 +659,7 @@ func (p *UnregisterServiceResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *UnregisterServiceResult) GetSuccess() *kitex_gen.UnregisterServiceResp {
+func (p *UnregisterServiceResult) GetSuccess() *backbon.UnregisterServiceResp {
 	if !p.IsSetSuccess() {
 		return UnregisterServiceResult_Success_DEFAULT
 	}
@@ -667,7 +667,7 @@ func (p *UnregisterServiceResult) GetSuccess() *kitex_gen.UnregisterServiceResp 
 }
 
 func (p *UnregisterServiceResult) SetSuccess(x interface{}) {
-	p.Success = x.(*kitex_gen.UnregisterServiceResp)
+	p.Success = x.(*backbon.UnregisterServiceResp)
 }
 
 func (p *UnregisterServiceResult) IsSetSuccess() bool {
@@ -682,17 +682,17 @@ func getServiceHandler(ctx context.Context, handler interface{}, arg, result int
 	switch s := arg.(type) {
 	case *streaming.Args:
 		st := s.Stream
-		req := new(kitex_gen.GetServiceReq)
+		req := new(backbon.GetServiceReq)
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.(kitex_gen.BackbonService).GetService(ctx, req)
+		resp, err := handler.(backbon.BackbonService).GetService(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *GetServiceArgs:
-		success, err := handler.(kitex_gen.BackbonService).GetService(ctx, s.Req)
+		success, err := handler.(backbon.BackbonService).GetService(ctx, s.Req)
 		if err != nil {
 			return err
 		}
@@ -712,7 +712,7 @@ func newGetServiceResult() interface{} {
 }
 
 type GetServiceArgs struct {
-	Req *kitex_gen.GetServiceReq
+	Req *backbon.GetServiceReq
 }
 
 func (p *GetServiceArgs) Marshal(out []byte) ([]byte, error) {
@@ -723,7 +723,7 @@ func (p *GetServiceArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *GetServiceArgs) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.GetServiceReq)
+	msg := new(backbon.GetServiceReq)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -731,9 +731,9 @@ func (p *GetServiceArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var GetServiceArgs_Req_DEFAULT *kitex_gen.GetServiceReq
+var GetServiceArgs_Req_DEFAULT *backbon.GetServiceReq
 
-func (p *GetServiceArgs) GetReq() *kitex_gen.GetServiceReq {
+func (p *GetServiceArgs) GetReq() *backbon.GetServiceReq {
 	if !p.IsSetReq() {
 		return GetServiceArgs_Req_DEFAULT
 	}
@@ -749,10 +749,10 @@ func (p *GetServiceArgs) GetFirstArgument() interface{} {
 }
 
 type GetServiceResult struct {
-	Success *kitex_gen.GetServiceResp
+	Success *backbon.GetServiceResp
 }
 
-var GetServiceResult_Success_DEFAULT *kitex_gen.GetServiceResp
+var GetServiceResult_Success_DEFAULT *backbon.GetServiceResp
 
 func (p *GetServiceResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -762,7 +762,7 @@ func (p *GetServiceResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *GetServiceResult) Unmarshal(in []byte) error {
-	msg := new(kitex_gen.GetServiceResp)
+	msg := new(backbon.GetServiceResp)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -770,7 +770,7 @@ func (p *GetServiceResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *GetServiceResult) GetSuccess() *kitex_gen.GetServiceResp {
+func (p *GetServiceResult) GetSuccess() *backbon.GetServiceResp {
 	if !p.IsSetSuccess() {
 		return GetServiceResult_Success_DEFAULT
 	}
@@ -778,7 +778,7 @@ func (p *GetServiceResult) GetSuccess() *kitex_gen.GetServiceResp {
 }
 
 func (p *GetServiceResult) SetSuccess(x interface{}) {
-	p.Success = x.(*kitex_gen.GetServiceResp)
+	p.Success = x.(*backbon.GetServiceResp)
 }
 
 func (p *GetServiceResult) IsSetSuccess() bool {
@@ -799,7 +799,7 @@ func newServiceClient(c client.Client) *kClient {
 	}
 }
 
-func (p *kClient) CheckUserOnline(ctx context.Context, Req *kitex_gen.CheckUserOnlineReq) (r *kitex_gen.CheckUserOnlineResp, err error) {
+func (p *kClient) CheckUserOnline(ctx context.Context, Req *backbon.CheckUserOnlineReq) (r *backbon.CheckUserOnlineResp, err error) {
 	var _args CheckUserOnlineArgs
 	_args.Req = Req
 	var _result CheckUserOnlineResult
@@ -809,7 +809,7 @@ func (p *kClient) CheckUserOnline(ctx context.Context, Req *kitex_gen.CheckUserO
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) PushData(ctx context.Context, Req *kitex_gen.PushDataReq) (r *kitex_gen.PushDataResp, err error) {
+func (p *kClient) PushData(ctx context.Context, Req *backbon.PushDataReq) (r *backbon.PushDataResp, err error) {
 	var _args PushDataArgs
 	_args.Req = Req
 	var _result PushDataResult
@@ -819,7 +819,7 @@ func (p *kClient) PushData(ctx context.Context, Req *kitex_gen.PushDataReq) (r *
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) PushToConnection(ctx context.Context, Req *kitex_gen.PushToConnectionReq) (r *kitex_gen.PushToConnectionResp, err error) {
+func (p *kClient) PushToConnection(ctx context.Context, Req *backbon.PushToConnectionReq) (r *backbon.PushToConnectionResp, err error) {
 	var _args PushToConnectionArgs
 	_args.Req = Req
 	var _result PushToConnectionResult
@@ -829,7 +829,7 @@ func (p *kClient) PushToConnection(ctx context.Context, Req *kitex_gen.PushToCon
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) RegisterService(ctx context.Context, Req *kitex_gen.RegisterServiceReq) (r *kitex_gen.RegisterServiceResp, err error) {
+func (p *kClient) RegisterService(ctx context.Context, Req *backbon.RegisterServiceReq) (r *backbon.RegisterServiceResp, err error) {
 	var _args RegisterServiceArgs
 	_args.Req = Req
 	var _result RegisterServiceResult
@@ -839,7 +839,7 @@ func (p *kClient) RegisterService(ctx context.Context, Req *kitex_gen.RegisterSe
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) UnregisterService(ctx context.Context, Req *kitex_gen.UnregisterServiceReq) (r *kitex_gen.UnregisterServiceResp, err error) {
+func (p *kClient) UnregisterService(ctx context.Context, Req *backbon.UnregisterServiceReq) (r *backbon.UnregisterServiceResp, err error) {
 	var _args UnregisterServiceArgs
 	_args.Req = Req
 	var _result UnregisterServiceResult
@@ -849,7 +849,7 @@ func (p *kClient) UnregisterService(ctx context.Context, Req *kitex_gen.Unregist
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) GetService(ctx context.Context, Req *kitex_gen.GetServiceReq) (r *kitex_gen.GetServiceResp, err error) {
+func (p *kClient) GetService(ctx context.Context, Req *backbon.GetServiceReq) (r *backbon.GetServiceResp, err error) {
 	var _args GetServiceArgs
 	_args.Req = Req
 	var _result GetServiceResult

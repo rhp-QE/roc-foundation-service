@@ -8,8 +8,8 @@ package backbon
 import (
 	"context"
 
-	"github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen"
-	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbonservice"
+	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
+	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
 	"github.com/roc/roc-foundation-util-go/cache"
 )
@@ -40,7 +40,7 @@ func NewBackbonServiceImpl(hub *frontier.Hub, serviceCtx ServiceContext) *Backbo
 }
 
 // CheckUserOnline implements the BackbonServiceImpl interface.
-func (s *BackbonServiceImpl) CheckUserOnline(ctx context.Context, req *kitex_gen.CheckUserOnlineReq) (resp *kitex_gen.CheckUserOnlineResp, err error) {
+func (s *BackbonServiceImpl) CheckUserOnline(ctx context.Context, req *backbon.CheckUserOnlineReq) (resp *backbon.CheckUserOnlineResp, err error) {
 	// TODO: Your code here...
 	return
 }
