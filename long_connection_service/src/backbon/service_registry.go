@@ -13,7 +13,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
-	"github.com/roc/roc-foundation-util-go/stringutil"
+	"github.com/rhp-QE/roc-foundation-util-go/stringutil"
 )
 
 // RegisterService implements the BackbonServiceImpl interface.

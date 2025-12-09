@@ -18,12 +18,12 @@ import (
 	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/config"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
-	"github.com/roc/roc-foundation-util-go/cache"
-	"github.com/roc/roc-foundation-util-go/cache/redis"
-	"github.com/roc/roc-foundation-util-go/service_registry/discovery"
-	"github.com/roc/roc-foundation-util-go/service_registry/loadbalancer"
-	"github.com/roc/roc-foundation-util-go/service_registry/registry"
-	"github.com/roc/roc-foundation-util-go/service_registry/registry/etcd"
+	"github.com/rhp-QE/roc-foundation-util-go/cache"
+	"github.com/rhp-QE/roc-foundation-util-go/cache/redis"
+	"github.com/rhp-QE/roc-foundation-util-go/service_registry/discovery"
+	"github.com/rhp-QE/roc-foundation-util-go/service_registry/loadbalancer"
+	"github.com/rhp-QE/roc-foundation-util-go/service_registry/registry"
+	"github.com/rhp-QE/roc-foundation-util-go/service_registry/registry/etcd"
 )
 
 // ServiceContext 服务上下文，管理全局共享资源

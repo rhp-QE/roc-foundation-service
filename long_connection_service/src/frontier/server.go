@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/roc/roc-foundation-util-go/cache"
-	"github.com/roc/roc-foundation-util-go/service_registry/discovery"
+	"github.com/rhp-QE/roc-foundation-util-go/cache"
+	"github.com/rhp-QE/roc-foundation-util-go/service_registry/discovery"
 )
 
 // Server WebSocket服务器

@@ -20,9 +20,9 @@ import (
 	"github.com/cloudwego/kitex/server"
 	"github.com/google/uuid"
 	"github.com/kitex-contrib/obs-opentelemetry/tracing"
-	"github.com/roc/roc-foundation-util-go/log/otel"
-	"github.com/roc/roc-foundation-util-go/network"
-	foundationregistry "github.com/roc/roc-foundation-util-go/service_registry/registry"
+	"github.com/rhp-QE/roc-foundation-util-go/log/otel"
+	"github.com/rhp-QE/roc-foundation-util-go/network"
+	foundationregistry "github.com/rhp-QE/roc-foundation-util-go/service_registry/registry"
 
 	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	backbonImpl "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/backbon"

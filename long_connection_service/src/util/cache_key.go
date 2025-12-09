@@ -6,7 +6,7 @@
 package util
 
 import (
-	"github.com/roc/roc-foundation-util-go/stringutil"
+	"github.com/rhp-QE/roc-foundation-util-go/stringutil"
 )
 
 // GetServiceKeyInCache 获取服务在缓存中的 key

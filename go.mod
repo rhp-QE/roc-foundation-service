@@ -89,8 +89,8 @@ require (
 
 require (
 	github.com/kitex-contrib/obs-opentelemetry v0.3.0
-	github.com/roc/roc-foundation-util-go v0.0.0-00010101000000-000000000000
+	github.com/rhp-QE/roc-foundation-util-go v0.0.0-00010101000000-000000000000
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/roc/roc-foundation-util-go => ../roc-foundation-util-go
+replace github.com/rhp-QE/roc-foundation-util-go => ../roc-foundation-util-go

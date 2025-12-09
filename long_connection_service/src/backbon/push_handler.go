@@ -14,8 +14,8 @@ import (
 	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
-	"github.com/roc/roc-foundation-util-go/cache"
-	"github.com/roc/roc-foundation-util-go/stringutil"
+	"github.com/rhp-QE/roc-foundation-util-go/cache"
+	"github.com/rhp-QE/roc-foundation-util-go/stringutil"
 )
 
 // PushData implements the BackbonServiceImpl interface.

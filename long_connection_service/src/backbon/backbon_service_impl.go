@@ -11,7 +11,7 @@ import (
 	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
 	backbonservice "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
-	"github.com/roc/roc-foundation-util-go/cache"
+	"github.com/rhp-QE/roc-foundation-util-go/cache"
 )
 
 // ServiceContext 服务上下文接口（依赖倒置，解耦具体实现）
