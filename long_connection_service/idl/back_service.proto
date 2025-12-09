@@ -1,0 +1,36 @@
+syntax = "proto3";
+package backservice;
+
+option go_package = "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen";
+
+// CallRequest 网关调用后端服务的请求
+// 网关接收到客户端请求后，将请求转发给对应的后端服务
+message CallRequest {
+  string requestID = 1; // 请求ID（用于请求-响应匹配）
+  string type = 2; // 消息类型（与Message.type对齐）
+  string service = 3; // 服务名称（与Message.service对齐）
+  string method = 4; // 方法名称（与Message.method对齐）
+  bytes payload = 5; // 业务数据（字节数组，由业务方解析，与Message.payload对齐）
+  map<string, string> metadata = 6; // 元数据（验证信息如token、track_id等，与Message.metadata对齐）
+  string userID = 7; // 用户ID（从连接中获取，额外字段）
+  string connectionID = 8; // 连接ID（可选，额外字段）
+  int64 timestamp = 9; // 时间戳（与Message.timestamp对齐）
+}
+
+// CallResponse 网关调用后端服务的响应
+message CallResponse {
+  string requestID = 1; // 请求ID（对应请求的requestID）
+  string type = 2; // 消息类型（与Message.type对齐）
+  bool success = 3; // 是否成功
+  bytes payload = 4; // 响应数据（字节数组，由业务方解析，与Message.payload对齐）
+  string error = 5; // 错误信息（如果失败，与Message.error对齐）
+  map<string, string> metadata = 6; // 响应元数据（可选，与Message.metadata对齐）
+  int64 timestamp = 7; // 时间戳（与Message.timestamp对齐）
+}
+
+// BackService 后端服务接口
+service BackService {
+  // Call 调用后端服务
+  rpc Call(CallRequest) returns (CallResponse);
+}
+

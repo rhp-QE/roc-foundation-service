@@ -202,40 +202,6 @@ func (x *PushDataReq) GetBroadcast() bool {
 	return false
 }
 
-// PushDataResp 推送数据响应
-type PushDataResp struct {
-	SuccessCount int32         `protobuf:"varint,1,opt,name=successCount" json:"successCount,omitempty"` // 成功推送数量
-	FailCount    int32         `protobuf:"varint,2,opt,name=failCount" json:"failCount,omitempty"`       // 失败推送数量
-	Results      []*PushResult `protobuf:"bytes,3,rep,name=results" json:"results,omitempty"`            // 推送结果详情
-}
-
-func (x *PushDataResp) Reset() { *x = PushDataResp{} }
-
-func (x *PushDataResp) Marshal(in []byte) ([]byte, error) { return prutal.MarshalAppend(in, x) }
-
-func (x *PushDataResp) Unmarshal(in []byte) error { return prutal.Unmarshal(in, x) }
-
-func (x *PushDataResp) GetSuccessCount() int32 {
-	if x != nil {
-		return x.SuccessCount
-	}
-	return 0
-}
-
-func (x *PushDataResp) GetFailCount() int32 {
-	if x != nil {
-		return x.FailCount
-	}
-	return 0
-}
-
-func (x *PushDataResp) GetResults() []*PushResult {
-	if x != nil {
-		return x.Results
-	}
-	return nil
-}
-
 // PushResult 推送结果
 type PushResult struct {
 	UserID          string `protobuf:"bytes,1,opt,name=userID" json:"userID,omitempty"`                    // 用户ID
@@ -276,6 +242,40 @@ func (x *PushResult) GetConnectionCount() int32 {
 		return x.ConnectionCount
 	}
 	return 0
+}
+
+// PushDataResp 推送数据响应
+type PushDataResp struct {
+	SuccessCount int32         `protobuf:"varint,1,opt,name=successCount" json:"successCount,omitempty"` // 成功推送数量
+	FailCount    int32         `protobuf:"varint,2,opt,name=failCount" json:"failCount,omitempty"`       // 失败推送数量
+	Results      []*PushResult `protobuf:"bytes,3,rep,name=results" json:"results,omitempty"`            // 推送结果详情
+}
+
+func (x *PushDataResp) Reset() { *x = PushDataResp{} }
+
+func (x *PushDataResp) Marshal(in []byte) ([]byte, error) { return prutal.MarshalAppend(in, x) }
+
+func (x *PushDataResp) Unmarshal(in []byte) error { return prutal.Unmarshal(in, x) }
+
+func (x *PushDataResp) GetSuccessCount() int32 {
+	if x != nil {
+		return x.SuccessCount
+	}
+	return 0
+}
+
+func (x *PushDataResp) GetFailCount() int32 {
+	if x != nil {
+		return x.FailCount
+	}
+	return 0
+}
+
+func (x *PushDataResp) GetResults() []*PushResult {
+	if x != nil {
+		return x.Results
+	}
+	return nil
 }
 
 // PushToConnectionReq 推送到指定连接请求

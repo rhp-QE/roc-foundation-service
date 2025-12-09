@@ -1,0 +1,130 @@
+syntax = "proto3";
+package backbonservice;
+
+option go_package = "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen";
+
+// CheckUserOnlineReq 检查用户在线状态请求
+message CheckUserOnlineReq {
+  repeated string userIDs = 1; // 用户ID列表
+}
+
+// UserOnlineStatus 用户在线状态
+message UserOnlineStatus {
+  string userID = 1; // 用户ID
+  bool isOnline = 2; // 是否在线
+  int32 connectionCount = 3; // 连接数量
+  repeated int32 platformIDs = 4; // 在线平台ID列表
+  int64 lastActiveTime = 5; // 最后活跃时间戳
+}
+
+// CheckUserOnlineResp 检查用户在线状态响应
+message CheckUserOnlineResp {
+  repeated UserOnlineStatus statuses = 1; // 用户在线状态列表
+}
+
+// PushMessage 推送消息结构（参考Message结构，加上元数据）
+message PushMessage {
+  string requestID = 1; // 请求ID（用于请求-响应匹配）
+  string type = 2; // 消息类型（如：push, notification, command等）
+  string service = 3; // 目标服务名称（可选）
+  string method = 4; // 服务方法名称（可选）
+  bytes payload = 5; // 消息有效载荷/数据（字节数组）
+  string error = 6; // 错误信息（响应时使用，可选）
+  int64 timestamp = 7; // 时间戳
+  map<string, string> metadata = 8; // 元数据（可选，用于传递额外的键值对信息，如：消息优先级、过期时间、路由信息等）
+}
+
+// PushDataReq 推送数据请求
+message PushDataReq {
+  repeated string userIDs = 1; // 目标用户ID列表
+  PushMessage message = 2; // 推送的消息内容
+  bool broadcast = 3; // 是否广播给所有连接（如果为true，忽略userIDs）
+}
+
+// PushResult 推送结果
+message PushResult {
+  string userID = 1; // 用户ID
+  bool success = 2; // 是否成功
+  string error = 3; // 错误信息（如果失败）
+  int32 connectionCount = 4; // 推送到的连接数量
+}
+
+// PushDataResp 推送数据响应
+message PushDataResp {
+  int32 successCount = 1; // 成功推送数量
+  int32 failCount = 2; // 失败推送数量
+  repeated PushResult results = 3; // 推送结果详情
+}
+
+// PushToConnectionReq 推送到指定连接请求
+message PushToConnectionReq {
+  string connectionID = 1; // 连接ID
+  PushMessage message = 2; // 推送的消息内容
+}
+
+// PushToConnectionResp 推送到指定连接响应
+message PushToConnectionResp {
+  bool success = 1; // 是否成功
+  string error = 2; // 错误信息（如果失败）
+}
+
+// RegisterServiceReq 注册服务请求
+// 网关转发流程：接收到客户端请求(service, method) -> 检查是否注册 -> 从注册中心获取服务实例 -> 转发数据
+// 注意：ip:port 信息在注册中心中，这里只注册 service 和 method 的映射关系
+message RegisterServiceReq {
+  string service = 1; // 服务名称（必须在注册中心已注册）
+  repeated string methods = 2; // 支持的方法列表（可选，如果为空则所有method都转发到此服务）
+}
+
+// RegisterServiceResp 注册服务响应
+message RegisterServiceResp {
+  bool success = 1; // 是否成功
+  string error = 2; // 错误信息（如果失败）
+}
+
+// UnregisterServiceReq 注销服务请求
+message UnregisterServiceReq {
+  string service = 1; // 服务名称
+  repeated string methods = 2; // 要注销的方法列表（可选，如果为空则注销该服务的所有方法）
+}
+
+// UnregisterServiceResp 注销服务响应
+message UnregisterServiceResp {
+  bool success = 1; // 是否成功
+  string error = 2; // 错误信息（如果失败）
+}
+
+// GetServiceReq 获取服务请求
+// 用于查询(service, method)是否已注册，ip:port 从注册中心获取
+message GetServiceReq {
+  string service = 1; // 服务名称
+  string method = 2; // 方法名称（可选）
+}
+
+// GetServiceResp 获取服务响应
+message GetServiceResp {
+  bool registered = 1; // 是否已注册
+  string service = 2; // 服务名称（如果已注册，用于从注册中心查询实例）
+}
+
+// BackbonService 后端骨干服务接口
+service BackbonService {
+  // CheckUserOnline 检查用户在线状态
+  rpc CheckUserOnline(CheckUserOnlineReq) returns (CheckUserOnlineResp);
+  
+  // PushData 推送数据到用户
+  rpc PushData(PushDataReq) returns (PushDataResp);
+  
+  // PushToConnection 推送到指定连接
+  rpc PushToConnection(PushToConnectionReq) returns (PushToConnectionResp);
+  
+  // RegisterService 注册服务
+  rpc RegisterService(RegisterServiceReq) returns (RegisterServiceResp);
+  
+  // UnregisterService 注销服务
+  rpc UnregisterService(UnregisterServiceReq) returns (UnregisterServiceResp);
+  
+  // GetService 获取服务信息
+  rpc GetService(GetServiceReq) returns (GetServiceResp);
+}
+
