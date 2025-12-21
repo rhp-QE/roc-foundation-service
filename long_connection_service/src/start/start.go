@@ -25,7 +25,7 @@ import (
 	foundationregistry "github.com/rhp-QE/roc-foundation-util-go/service_registry/registry"
 
 	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
-	backbonImpl "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/backbon"
+	backbonapi "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/backbon/api"
 	frontier "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/servicecontext"
 )
@@ -124,8 +124,8 @@ func createServers(serviceCtx *servicecontext.ServiceContext, host string) (*fro
 	// 创建 Frontier 服务器
 	frontierServer := frontier.NewServer(serviceCtx)
 
-	// 创建 Backbon 服务
-	backbonService := backbonImpl.NewBackbonServiceImpl(frontierServer.GetHub(), serviceCtx)
+	// 创建 Backbon 服务（通过 api 层）
+	backbonService := backbonapi.NewBackbonServiceImpl(frontierServer.GetHub(), serviceCtx)
 
 	// 创建 Backbon RPC 服务器
 	backbonServer := backbon.NewServer(
