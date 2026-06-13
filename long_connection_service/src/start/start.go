@@ -112,6 +112,7 @@ func createServiceInstance(host string) *foundationregistry.ServiceInstance {
 		InstanceID:  instanceID,
 		Host:        host,
 		Port:        8956,
+		Status:      foundationregistry.StatusHealthy,
 		Weight:      1,
 		Metadata: map[string]string{
 			"version": "1.0.0",

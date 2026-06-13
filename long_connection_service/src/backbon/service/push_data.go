@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -145,6 +146,10 @@ func (s *backbonServiceImpl) pushToUser(
 		}
 	}
 	result.ConnectionCount = totalConnCount
+	if totalConnCount == 0 && len(remoteResults) == 0 {
+		result.Success = true
+		return result
+	}
 
 	// 如果有错误，记录第一个错误
 	if !result.Success && len(remoteResults) > 0 {
@@ -199,6 +204,11 @@ func (s *backbonServiceImpl) pushToRemoteMachines(
 	// 从 storage 获取用户连接映射
 	connectionMappings, err := s.getUserConnectionMappings(ctx, userID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNoLiveConnectionMappings) {
+			klog.CtxDebugf(ctx, "User %s has no live connection mappings, skip remote push", userID)
+			return []*backbon.PushResult{}
+		}
+
 		klog.CtxWarnf(ctx, "User %s connection mappings not found: %v", userID, err)
 		return []*backbon.PushResult{{
 			UserID:  userID,
@@ -213,9 +223,20 @@ func (s *backbonServiceImpl) pushToRemoteMachines(
 
 	// 遍历所有连接进行推送
 	results := make([]*backbon.PushResult, 0, len(connectionMappings))
+	store := storage.NewBackbonStorage(s.serviceCtx)
 	for connectionID, machineAddr := range connectionMappings {
 		// 跳过本机地址（本机已经在 tryPushToLocalUser 中处理）
 		if machineAddr == localAddr {
+			hub := s.getHub()
+			if hub != nil {
+				if _, exists := hub.GetConnection(connectionID); !exists {
+					if err := store.RemoveConnectionMapping(ctx, userID, connectionID); err != nil {
+						klog.CtxWarnf(ctx, "Failed to remove stale local connection mapping %s for user %s: %v", connectionID, userID, err)
+					} else {
+						klog.CtxInfof(ctx, "Removed stale local connection mapping %s for user %s", connectionID, userID)
+					}
+				}
+			}
 			continue
 		}
 

@@ -9,6 +9,8 @@ import (
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
 )
 
+const connectionMappingTTL = 24 * time.Hour
+
 // Hub 维护所有活跃的连接并处理消息分发
 type Hub struct {
 	// 注册的连接集合
@@ -174,20 +176,28 @@ func (h *Hub) updateRedisOnRegister(ctx context.Context, conn *Connection) {
 
 	localAddress := h.serviceCtx.GetLocalAddress()
 
-	// 1. 在用户连接 Hash 中添加 connectionID -> 机器地址映射
-	userKey := util.GetUserConnectionKeyInCache(conn.UserID)
-	err := redis.HSet(ctx, userKey, conn.ID, localAddress)
-	if err != nil {
-		klog.Errorf("Failed to update user connection in Redis for user %s: %v", conn.UserID, err)
-		return
-	}
-
-	// 2. 在连接 key 中存储连接所在的机器地址
+	// 1. 在连接 key 中存储连接所在的机器地址。先写 connection key，再写 user hash，
+	// 避免推送读取到刚写入但尚未可校验的连接映射。
 	connectionKey := util.GetConnectionKeyInCache(conn.ID)
-	err = redis.Set(ctx, connectionKey, localAddress, 24*time.Hour)
+	err := redis.Set(ctx, connectionKey, localAddress, connectionMappingTTL)
 	if err != nil {
 		klog.Errorf("Failed to set connection address in Redis for connection %s: %v", conn.ID, err)
 		return
+	}
+
+	// 2. 在用户连接 Hash 中添加 connectionID -> 机器地址映射
+	userKey := util.GetUserConnectionKeyInCache(conn.UserID)
+	err = redis.HSet(ctx, userKey, conn.ID, localAddress)
+	if err != nil {
+		klog.Errorf("Failed to update user connection in Redis for user %s: %v", conn.UserID, err)
+		if deleteErr := redis.Delete(ctx, connectionKey); deleteErr != nil {
+			klog.Errorf("Failed to rollback connection key %s after user hash update failed: %v", connectionKey, deleteErr)
+		}
+		return
+	}
+
+	if err := redis.Expire(ctx, userKey, connectionMappingTTL); err != nil {
+		klog.Warnf("Failed to set expire for user connection key %s: %v", userKey, err)
 	}
 
 	klog.Infof("Registered connection %s (user: %s) in Redis at %s", conn.ID, conn.UserID, localAddress)

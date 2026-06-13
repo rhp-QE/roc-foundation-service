@@ -2,11 +2,16 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
+	"github.com/rhp-QE/roc-foundation-util-go/cache"
 	"github.com/rhp-QE/roc-foundation-util-go/stringutil"
 )
+
+var ErrNoLiveConnectionMappings = errors.New("no live connection mappings")
 
 // GetUserConnectionMappings 获取用户的所有连接映射
 // Redis 存储结构：key = "fronter:user:connection:{userID}" (Hash)
@@ -27,15 +32,46 @@ func (s *backbonStorageImpl) GetUserConnectionMappings(ctx context.Context, user
 	}
 
 	if len(mappings) == 0 {
-		return nil, fmt.Errorf("no connection mappings found for user %s", userID)
+		return nil, fmt.Errorf("%w for user %s", ErrNoLiveConnectionMappings, userID)
 	}
 
-	// 过滤空值
+	// 过滤空值，并清理 user hash 中已经失效的 connectionID。
+	// connection key 是连接是否仍然存活的可信来源，user hash 只是按用户索引连接。
 	result := make(map[string]string, len(mappings))
+	staleConnectionIDs := make([]string, 0)
 	for connectionID, machineAddr := range mappings {
-		if !stringutil.IsEmpty(connectionID) && !stringutil.IsEmpty(machineAddr) {
-			result[connectionID] = machineAddr
+		if stringutil.IsEmpty(connectionID) || stringutil.IsEmpty(machineAddr) {
+			continue
 		}
+
+		connectionKey := util.GetConnectionKeyInCache(connectionID)
+		liveMachineAddr, err := redisCache.Get(ctx, connectionKey)
+		if err != nil {
+			if errors.Is(err, cache.ErrKeyNotFound) {
+				staleConnectionIDs = append(staleConnectionIDs, connectionID)
+				continue
+			}
+			return nil, fmt.Errorf("failed to verify connection %s from Redis: %w", connectionID, err)
+		}
+
+		if stringutil.IsEmpty(liveMachineAddr) {
+			staleConnectionIDs = append(staleConnectionIDs, connectionID)
+			continue
+		}
+
+		result[connectionID] = liveMachineAddr
+	}
+
+	if len(staleConnectionIDs) > 0 {
+		if _, err := redisCache.HDel(ctx, userKey, staleConnectionIDs...); err != nil {
+			klog.CtxWarnf(ctx, "Failed to remove stale connection mappings for user %s: %v", userID, err)
+		} else {
+			klog.CtxInfof(ctx, "Removed %d stale connection mappings for user %s", len(staleConnectionIDs), userID)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("%w for user %s", ErrNoLiveConnectionMappings, userID)
 	}
 
 	return result, nil
@@ -59,4 +95,27 @@ func (s *backbonStorageImpl) GetConnectionMachineAddr(ctx context.Context, conne
 	}
 
 	return machineAddr, nil
+}
+
+func (s *backbonStorageImpl) RemoveConnectionMapping(ctx context.Context, userID string, connectionID string) error {
+	redisCache := s.getRedis()
+	if redisCache == nil {
+		return fmt.Errorf("Redis is not available")
+	}
+
+	if stringutil.IsEmpty(userID) || stringutil.IsEmpty(connectionID) {
+		return nil
+	}
+
+	userKey := util.GetUserConnectionKeyInCache(userID)
+	if _, err := redisCache.HDel(ctx, userKey, connectionID); err != nil {
+		return fmt.Errorf("failed to remove connection %s from user %s mappings: %w", connectionID, userID, err)
+	}
+
+	connectionKey := util.GetConnectionKeyInCache(connectionID)
+	if err := redisCache.Delete(ctx, connectionKey); err != nil {
+		return fmt.Errorf("failed to remove connection key %s: %w", connectionID, err)
+	}
+
+	return nil
 }

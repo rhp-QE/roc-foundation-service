@@ -13,6 +13,8 @@ type BackbonStorage interface {
 	GetUserConnectionMappings(ctx context.Context, userID string) (map[string]string, error)
 	// GetConnectionMachineAddr 获取连接所在机器地址
 	GetConnectionMachineAddr(ctx context.Context, connectionID string) (string, error)
+	// RemoveConnectionMapping 删除用户连接映射及连接地址
+	RemoveConnectionMapping(ctx context.Context, userID string, connectionID string) error
 	// RegisterService 注册服务
 	RegisterService(ctx context.Context, serviceName string, methods []string) error
 	// UnregisterService 注销服务
@@ -36,4 +38,3 @@ func NewBackbonStorage(serviceCtx *servicecontext.ServiceContext) BackbonStorage
 func (s *backbonStorageImpl) getRedis() cache.Cache {
 	return s.serviceCtx.GetRedis()
 }
-
