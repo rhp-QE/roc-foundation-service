@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
+	kitexdiscovery "github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/rhp-QE/roc-foundation-util-go/cache"
-	"github.com/rhp-QE/roc-foundation-util-go/service_registry/discovery"
 )
 
 // Server WebSocket服务器
@@ -23,7 +23,7 @@ type ServiceContext interface {
 	GetLocalAddress() string
 	GetRedis() cache.Cache
 	GetFrontierConfig() *Config
-	GetDiscovery() discovery.Discovery
+	GetKitexResolver() kitexdiscovery.Resolver
 }
 
 // NewServer 创建新的WebSocket服务器（从 ServiceContext 获取配置）

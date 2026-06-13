@@ -45,8 +45,7 @@ type Hub struct {
 	// 服务上下文（可选，用于存储连接状态）
 	serviceCtx ServiceContext
 
-	// 实际的 ServiceContext 结构体（用于直接访问 Registry 和 Discovery）
-	// 通过类型断言访问实际的 ServiceContext 结构体字段
+	// 实际的 ServiceContext 结构体（用于访问长链运行期依赖）
 	actualServiceCtx interface{}
 
 	// 路由缓存与连接生命周期

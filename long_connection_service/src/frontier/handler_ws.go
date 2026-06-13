@@ -265,31 +265,22 @@ func (h *WebSocketHandler) validateRequest(msg *Message) error {
 	return nil
 }
 
-// callBackendService 获取服务实例并调用后端服务
+// callBackendService 通过 Kitex resolver 调用后端服务。
 func (h *WebSocketHandler) callBackendService(ctx context.Context, serviceCtx ServiceContext, msg *Message, conn *Connection) (*back.CallResponse, error) {
-	// 获取服务实例
-	discoveryClient := serviceCtx.GetDiscovery()
-	if discoveryClient == nil {
-		return nil, fmt.Errorf("service discovery not available")
+	resolver := serviceCtx.GetKitexResolver()
+	if resolver == nil {
+		return nil, fmt.Errorf("kitex resolver not available")
 	}
 
-	instance, err := discoveryClient.GetInstance(ctx, msg.Service)
-	if err != nil {
-		klog.Errorf("Failed to discover service instance for %s: %v", msg.Service, err)
-		return nil, fmt.Errorf("failed to discover service: %v", err)
-	}
-
-	hostPort := fmt.Sprintf("%s:%d", instance.Host, instance.Port)
-
-	// 创建 backservice 客户端
 	backServiceClient, err := backservice.NewClient(
 		msg.Service,
-		client.WithHostPorts(hostPort),
+		client.WithResolver(resolver),
 		client.WithSuite(tracing.NewClientSuite()),
-		client.WithClientBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: msg.Service}),
+		client.WithClientBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "frontier"}),
+		client.WithRPCTimeout(10*time.Second),
 	)
 	if err != nil {
-		klog.Errorf("Failed to create backservice client for %s: %v", hostPort, err)
+		klog.Errorf("Failed to create backservice client for %s: %v", msg.Service, err)
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 

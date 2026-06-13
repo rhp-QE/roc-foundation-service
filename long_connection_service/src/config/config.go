@@ -29,8 +29,8 @@ type EtcdConfig struct {
 
 // RedisConfig Redis服务配置
 type RedisConfig struct {
-	ServiceName string `yaml:"serviceName"`
-	Password    string `yaml:"password"` // Redis 密码
+	Address  string `yaml:"address"`
+	Password string `yaml:"password"` // Redis 密码
 }
 
 // Load 加载配置
@@ -45,7 +45,8 @@ func Load(configPath string) (*Config, error) {
 				},
 			},
 			Redis: RedisConfig{
-				ServiceName: getEnvOrDefault("REDIS_SERVICE_NAME", "redis-service"),
+				Address:  getEnvOrDefault("REDIS_ADDRESS", "localhost:6379"),
+				Password: os.Getenv("REDIS_PASSWORD"),
 			},
 		}, nil
 	}
@@ -63,8 +64,15 @@ func Load(configPath string) (*Config, error) {
 
 	// 设置默认值
 	setFrontierDefaults(&config.Frontier)
+	setRedisDefaults(&config.Redis)
 
 	return &config, nil
+}
+
+func setRedisDefaults(r *RedisConfig) {
+	if r.Address == "" {
+		r.Address = "localhost:6379"
+	}
 }
 
 // setFrontierDefaults 设置 Frontier 配置的默认值

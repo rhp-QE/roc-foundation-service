@@ -42,8 +42,8 @@
 Frontier (handler_ws.go: HandleMessage)
   ↓ 检查服务注册状态
 BackbonService.GetService (查询 service+method 是否注册)
-  ↓ 从注册中心获取服务实例
-Discovery.GetInstance (获取 ip:port)
+  ↓ Kitex resolver 解析服务实例
+client.WithResolver (Kitex 服务发现 / 负载均衡)
   ↓ 转发请求
 BackService.Call (RPC 调用后端服务)
   ↓ 处理业务逻辑
@@ -145,4 +145,4 @@ kitex -compiler-path /usr/bin/protoc \
 
 - `github.com/cloudwego/kitex`: RPC 框架
 - `github.com/gorilla/websocket`: WebSocket 支持
-- `roc-foundation-util-go/service_registry`: 服务注册中心（etcd 等）
+- `github.com/kitex-contrib/registry-etcd`: Kitex etcd 注册与发现扩展

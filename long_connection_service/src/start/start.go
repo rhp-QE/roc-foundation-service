@@ -7,7 +7,6 @@ package start
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -16,19 +15,21 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	kitexregistry "github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/server"
-	"github.com/google/uuid"
 	"github.com/kitex-contrib/obs-opentelemetry/tracing"
 	"github.com/rhp-QE/roc-foundation-util-go/log/otel"
 	"github.com/rhp-QE/roc-foundation-util-go/network"
-	foundationregistry "github.com/rhp-QE/roc-foundation-util-go/service_registry/registry"
 
 	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon/backbonservice"
 	backbonapi "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/backbon/api"
 	frontier "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/kitexinfra"
 	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/servicecontext"
 )
+
+const backbonServiceName = "backbon-service"
 
 // Start 启动长连接服务
 // configPath: 配置文件路径，如果为空则使用默认路径 "config.yaml"
@@ -48,25 +49,23 @@ func Start(configPath string) error {
 	// 获取本机地址
 	host := getLocalIP()
 
-	// 创建服务实例
-	instance := createServiceInstance(host)
-
 	// 创建服务器
 	frontierServer, backbonServer := createServers(serviceCtx, host)
 
 	// 启动服务器
 	startServers(frontierServer, backbonServer)
 
-	// 注册服务到 etcd
-	registerService(serviceCtx, instance)
-
-	// 设置优雅关闭处理
-	defer setupGracefulShutdown(serviceCtx, instance)
-
-	klog.Infof("Backbon service starting - instance_id: %s, address: %s:%d", instance.InstanceID, host, 8956)
+	klog.Infof("Backbon service started, address: %s:%d", host, 8956)
 
 	// 等待关闭信号
 	waitForShutdown()
+
+	if err := frontierServer.Stop(); err != nil {
+		klog.Errorf("Frontier server stop failed: %v", err)
+	}
+	if err := backbonServer.Stop(); err != nil {
+		klog.Errorf("Backbon server stop failed: %v", err)
+	}
 
 	return nil
 }
@@ -104,24 +103,13 @@ func getLocalIP() string {
 	return host
 }
 
-// createServiceInstance 创建服务实例信息
-func createServiceInstance(host string) *foundationregistry.ServiceInstance {
-	instanceID := fmt.Sprintf("backbon-service-%s", uuid.New().String()[:8])
-	return &foundationregistry.ServiceInstance{
-		ServiceName: "backbon-service",
-		InstanceID:  instanceID,
-		Host:        host,
-		Port:        8956,
-		Status:      foundationregistry.StatusHealthy,
-		Weight:      1,
-		Metadata: map[string]string{
-			"version": "1.0.0",
-		},
-	}
-}
-
 // createServers 创建 Frontier 和 Backbon 服务器
 func createServers(serviceCtx *servicecontext.ServiceContext, host string) (*frontier.Server, server.Server) {
+	kitexRegistry, err := kitexinfra.NewEtcdRegistry(serviceCtx.Config.Registry.Etcd.Endpoints)
+	if err != nil {
+		klog.Fatalf("Failed to create kitex etcd registry: %v", err)
+	}
+
 	// 创建 Frontier 服务器
 	frontierServer := frontier.NewServer(serviceCtx)
 
@@ -133,7 +121,14 @@ func createServers(serviceCtx *servicecontext.ServiceContext, host string) (*fro
 		backbonService,
 		server.WithServiceAddr(&net.TCPAddr{IP: net.ParseIP(host), Port: 8956}),
 		server.WithSuite(tracing.NewServerSuite()),
-		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "backbon-service"}),
+		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: backbonServiceName}),
+		server.WithRegistry(kitexRegistry),
+		server.WithRegistryInfo(&kitexregistry.Info{
+			Weight: 1,
+			Tags: map[string]string{
+				"version": "1.0.0",
+			},
+		}),
 	)
 
 	return frontierServer, backbonServer
@@ -157,22 +152,6 @@ func startServers(frontierServer *frontier.Server, backbonServer server.Server) 
 
 	// 等待 1 秒确保服务已经启动并监听端口
 	time.Sleep(1 * time.Second)
-}
-
-// registerService 注册服务到 etcd
-func registerService(serviceCtx *servicecontext.ServiceContext, instance *foundationregistry.ServiceInstance) {
-	// 服务启动后再注册到 etcd，避免保活机制在服务未就绪时删除注册
-	if err := serviceCtx.Registry.Register(context.Background(), instance); err != nil {
-		klog.Fatalf("Failed to register service instance: %v", err)
-	}
-	klog.Infof("Successfully registered backbon-service to etcd")
-}
-
-// setupGracefulShutdown 设置优雅关闭处理
-func setupGracefulShutdown(serviceCtx *servicecontext.ServiceContext, instance *foundationregistry.ServiceInstance) {
-	if err := serviceCtx.Registry.Deregister(context.Background(), instance); err != nil {
-		klog.Errorf("Failed to deregister service instance: %v", err)
-	}
 }
 
 // waitForShutdown 等待关闭信号
