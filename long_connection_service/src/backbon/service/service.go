@@ -4,6 +4,9 @@ import (
 	"context"
 
 	backbon "github.com/rhp-QE/roc-foundation-service/long_connection_service/kitex_gen/backbon"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/frontier"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/push"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/route"
 	servicecontext "github.com/rhp-QE/roc-foundation-service/long_connection_service/src/servicecontext"
 )
 
@@ -35,4 +38,25 @@ func NewBackbonService(hub interface{}, serviceCtx *servicecontext.ServiceContex
 		hub:        hub,
 		serviceCtx: serviceCtx,
 	}
+}
+
+func (s *backbonServiceImpl) newPushRouter() *push.Router {
+	// Backbon service 只装配依赖，推送决策全部交给 PushRouter。
+	return push.NewRouter(s.routeStore(), s.getHub(), s.serviceCtx, s.serviceCtx.GetLocalAddress())
+}
+
+func (s *backbonServiceImpl) routeStore() route.Store {
+	// 优先复用 gateway Hub 的 RouteStore，保证 register/refresh/push 看到同一套 key 和 TTL。
+	if hub := s.getHub(); hub != nil && hub.GetRouteStore() != nil {
+		return hub.GetRouteStore()
+	}
+	return route.NewRedisStore(s.serviceCtx.GetRedis(), s.serviceCtx.GetLocalAddress(), route.DefaultTTL)
+}
+
+func (s *backbonServiceImpl) getHub() *frontier.Hub {
+	hub, ok := s.hub.(*frontier.Hub)
+	if !ok {
+		return nil
+	}
+	return hub
 }

@@ -17,8 +17,11 @@ type Connection struct {
 	Hub        *Hub                   // 所属的Hub
 	Metadata   map[string]interface{} // 连接元数据
 	mu         sync.RWMutex           // 保护元数据的锁
+	sendMu     sync.RWMutex           // 保护发送队列关闭状态
 	lastActive time.Time              // 最后活跃时间
+	loginAt    time.Time              // 登录时间
 	closeOnce  sync.Once              // 确保连接只关闭一次
+	closed     bool                   // 发送队列是否已关闭
 }
 
 // NewConnection 创建新连接
@@ -31,6 +34,7 @@ func NewConnection(id, userID string, conn *websocket.Conn, hub *Hub) *Connectio
 		Hub:        hub,
 		Metadata:   make(map[string]interface{}),
 		lastActive: time.Now(),
+		loginAt:    time.Now(),
 	}
 }
 
@@ -47,6 +51,7 @@ func (c *Connection) ReadPump() {
 	c.Conn.SetPingHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		c.UpdateLastActive()
+		c.Hub.RefreshConnectionPresence(c)
 		// gorilla/websocket 会自动回复 Pong 帧，这里只需要更新活跃时间
 		return nil
 	})
@@ -55,6 +60,7 @@ func (c *Connection) ReadPump() {
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		c.UpdateLastActive()
+		c.Hub.RefreshConnectionPresence(c)
 		return nil
 	})
 
@@ -68,6 +74,7 @@ func (c *Connection) ReadPump() {
 		}
 
 		c.UpdateLastActive()
+		c.Hub.RefreshConnectionPresence(c)
 
 		// 解析消息
 		var msg Message
@@ -106,14 +113,8 @@ func (c *Connection) WritePump() {
 			if err != nil {
 				return
 			}
+			// 一条 WebSocket message 只承载一个 JSON envelope，避免客户端按单帧解析时失败。
 			w.Write(message)
-
-			// 将队列中的其他消息也一起发送
-			n := len(c.Send)
-			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.Send)
-			}
 
 			if err := w.Close(); err != nil {
 				return
@@ -135,6 +136,13 @@ func (c *Connection) SendMessage(msg *Message) error {
 		return err
 	}
 
+	// 发送前检查关闭状态，避免 close(Send) 后并发写 channel 导致 panic。
+	c.sendMu.RLock()
+	defer c.sendMu.RUnlock()
+	if c.closed {
+		return ErrConnectionClosed
+	}
+
 	select {
 	case c.Send <- data:
 		return nil
@@ -154,8 +162,13 @@ func (c *Connection) SendError(errorMsg string) {
 // Close 关闭连接
 func (c *Connection) Close() {
 	c.closeOnce.Do(func() {
-		c.Hub.Unregister <- c
+		// 先关闭发送队列，再通知 Hub 注销；重复 close 由 closeOnce 保证幂等。
+		c.sendMu.Lock()
+		c.closed = true
 		close(c.Send)
+		c.sendMu.Unlock()
+
+		c.Hub.Unregister <- c
 		c.Conn.Close()
 	})
 }
@@ -174,6 +187,13 @@ func (c *Connection) GetLastActive() time.Time {
 	return c.lastActive
 }
 
+// GetLoginAt 获取连接登录时间
+func (c *Connection) GetLoginAt() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.loginAt
+}
+
 // SetMetadata 设置元数据
 func (c *Connection) SetMetadata(key string, value interface{}) {
 	c.mu.Lock()
@@ -187,6 +207,17 @@ func (c *Connection) GetMetadata(key string) (interface{}, bool) {
 	defer c.mu.RUnlock()
 	val, ok := c.Metadata[key]
 	return val, ok
+}
+
+func (c *Connection) MetadataString(key string) string {
+	val, ok := c.GetMetadata(key)
+	if !ok || val == nil {
+		return ""
+	}
+	if s, ok := val.(string); ok {
+		return s
+	}
+	return ""
 }
 
 // IsAlive 检查连接是否活跃

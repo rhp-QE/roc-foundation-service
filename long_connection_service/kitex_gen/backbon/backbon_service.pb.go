@@ -4,9 +4,46 @@ package backbon
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/cloudwego/prutal"
 )
+
+// PushStatus 推送结果状态
+type PushStatus int32
+
+const (
+	PushStatus_PUSH_STATUS_UNKNOWN       PushStatus = 0
+	PushStatus_PUSH_STATUS_SUCCESS       PushStatus = 1
+	PushStatus_PUSH_STATUS_NOOP_OFFLINE  PushStatus = 2
+	PushStatus_PUSH_STATUS_STALE_CLEANED PushStatus = 3
+	PushStatus_PUSH_STATUS_FAILED        PushStatus = 4
+)
+
+// Enum value maps for PushStatus.
+var PushStatus_name = map[int32]string{
+	0: "PUSH_STATUS_UNKNOWN",
+	1: "PUSH_STATUS_SUCCESS",
+	2: "PUSH_STATUS_NOOP_OFFLINE",
+	3: "PUSH_STATUS_STALE_CLEANED",
+	4: "PUSH_STATUS_FAILED",
+}
+
+var PushStatus_value = map[string]int32{
+	"PUSH_STATUS_UNKNOWN":       0,
+	"PUSH_STATUS_SUCCESS":       1,
+	"PUSH_STATUS_NOOP_OFFLINE":  2,
+	"PUSH_STATUS_STALE_CLEANED": 3,
+	"PUSH_STATUS_FAILED":        4,
+}
+
+func (x PushStatus) String() string {
+	s, ok := PushStatus_name[int32(x)]
+	if ok {
+		return s
+	}
+	return strconv.Itoa(int(x))
+}
 
 // CheckUserOnlineReq 检查用户在线状态请求
 type CheckUserOnlineReq struct {
@@ -204,10 +241,11 @@ func (x *PushDataReq) GetBroadcast() bool {
 
 // PushResult 推送结果
 type PushResult struct {
-	UserID          string `protobuf:"bytes,1,opt,name=userID" json:"userID,omitempty"`                    // 用户ID
-	Success         bool   `protobuf:"varint,2,opt,name=success" json:"success,omitempty"`                 // 是否成功
-	Error           string `protobuf:"bytes,3,opt,name=error" json:"error,omitempty"`                      // 错误信息（如果失败）
-	ConnectionCount int32  `protobuf:"varint,4,opt,name=connectionCount" json:"connectionCount,omitempty"` // 推送到的连接数量
+	UserID          string     `protobuf:"bytes,1,opt,name=userID" json:"userID,omitempty"`                    // 用户ID
+	Success         bool       `protobuf:"varint,2,opt,name=success" json:"success,omitempty"`                 // 是否成功
+	Error           string     `protobuf:"bytes,3,opt,name=error" json:"error,omitempty"`                      // 错误信息（如果失败）
+	ConnectionCount int32      `protobuf:"varint,4,opt,name=connectionCount" json:"connectionCount,omitempty"` // 推送到的连接数量
+	Status          PushStatus `protobuf:"varint,5,opt,name=status" json:"status,omitempty"`                   // 类型化结果状态
 }
 
 func (x *PushResult) Reset() { *x = PushResult{} }
@@ -242,6 +280,13 @@ func (x *PushResult) GetConnectionCount() int32 {
 		return x.ConnectionCount
 	}
 	return 0
+}
+
+func (x *PushResult) GetStatus() PushStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PushStatus_PUSH_STATUS_UNKNOWN
 }
 
 // PushDataResp 推送数据响应
@@ -306,8 +351,9 @@ func (x *PushToConnectionReq) GetMessage() *PushMessage {
 
 // PushToConnectionResp 推送到指定连接响应
 type PushToConnectionResp struct {
-	Success bool   `protobuf:"varint,1,opt,name=success" json:"success,omitempty"` // 是否成功
-	Error   string `protobuf:"bytes,2,opt,name=error" json:"error,omitempty"`      // 错误信息（如果失败）
+	Success bool       `protobuf:"varint,1,opt,name=success" json:"success,omitempty"` // 是否成功
+	Error   string     `protobuf:"bytes,2,opt,name=error" json:"error,omitempty"`      // 错误信息（如果失败）
+	Status  PushStatus `protobuf:"varint,3,opt,name=status" json:"status,omitempty"`   // 结果状态
 }
 
 func (x *PushToConnectionResp) Reset() { *x = PushToConnectionResp{} }
@@ -328,6 +374,13 @@ func (x *PushToConnectionResp) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *PushToConnectionResp) GetStatus() PushStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PushStatus_PUSH_STATUS_UNKNOWN
 }
 
 // RegisterServiceReq 注册服务请求

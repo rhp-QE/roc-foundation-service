@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/client"
@@ -31,6 +32,10 @@ type WebSocketHandler struct {
 	hub *Hub
 }
 
+type websocketSession struct {
+	connection *Connection
+}
+
 // NewWebSocketHandler 创建WebSocket处理器
 func NewWebSocketHandler(hub *Hub) *WebSocketHandler {
 	return &WebSocketHandler{
@@ -40,40 +45,144 @@ func NewWebSocketHandler(hub *Hub) *WebSocketHandler {
 
 // ServeHTTP 处理WebSocket连接请求
 func (h *WebSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// 升级HTTP连接为WebSocket连接
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// 主流程只保留接入步骤，认证、注册和 pump 启动分别下沉，避免入口堆业务细节。
+	rawConn, err := h.upgrade(w, r)
 	if err != nil {
-		http.Error(w, "Failed to upgrade connection", http.StatusBadRequest)
 		return
 	}
 
-	// 从请求中获取验证信息（token、track_id等）放到元数据中
-	token := r.URL.Query().Get("token")
-	trackID := r.URL.Query().Get("track_id")
-	userID := r.URL.Query().Get("user_id") // 临时处理，实际应该从token解析
-
-	// 创建连接对象
-	connectionID := uuid.New().String()
-	connection := NewConnection(connectionID, userID, conn, h.hub)
-
-	// 如果连接时有验证信息，保存到连接的元数据中
-	if token != "" {
-		connection.SetMetadata("token", token)
-	}
-	if trackID != "" {
-		connection.SetMetadata("track_id", trackID)
+	session, err := h.authenticateAndBuildSession(r, rawConn)
+	if err != nil {
+		h.reject(rawConn, err)
+		return
 	}
 
-	// 注册连接
-	h.hub.Register <- connection
+	h.registerSession(session)
+	h.sendWelcome(session)
+	h.startConnectionPumps(session)
+}
 
-	// 发送欢迎消息（网关不解析payload，由业务方处理）
+func (h *WebSocketHandler) upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		http.Error(w, "Failed to upgrade connection", http.StatusBadRequest)
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (h *WebSocketHandler) authenticateAndBuildSession(r *http.Request, rawConn *websocket.Conn) (*websocketSession, error) {
+	// 认证成功后才创建带 userID 的连接会话，后续 register 才能写 route。
+	binding, err := h.authenticateClient(r)
+	if err != nil {
+		klog.CtxWarnf(r.Context(), "WebSocket auth failed remoteAddr=%s error=%v", r.RemoteAddr, err)
+		return nil, err
+	}
+
+	connection := NewConnection(uuid.New().String(), binding.userID, rawConn, h.hub)
+	connection.SetMetadata("auth_mode", binding.authMode)
+	connection.SetMetadata("track_id", binding.trackID)
+	connection.SetMetadata("deviceID", binding.deviceID)
+	connection.SetMetadata("platform", binding.platform)
+	connection.SetMetadata("clientVersion", binding.clientVersion)
+	if binding.token != "" {
+		connection.SetMetadata("token", binding.token)
+	}
+
+	klog.CtxInfof(r.Context(), "WebSocket auth success userID=%s deviceID=%s connectionID=%s platform=%s authMode=%s",
+		binding.userID, binding.deviceID, connection.ID, binding.platform, binding.authMode)
+	return &websocketSession{connection: connection}, nil
+}
+
+type authBinding struct {
+	userID        string
+	token         string
+	authMode      string
+	trackID       string
+	deviceID      string
+	platform      string
+	clientVersion string
+}
+
+func (h *WebSocketHandler) authenticateClient(r *http.Request) (authBinding, error) {
+	query := r.URL.Query()
+	token := query.Get("token")
+	queryUserID := query.Get("user_id")
+	boundUserID, authMode, err := bindUserIDFromToken(token)
+	if err != nil {
+		return authBinding{}, err
+	}
+	// query user_id 只做一致性校验，不作为身份来源，避免伪造用户污染 route。
+	if queryUserID != "" && queryUserID != boundUserID {
+		return authBinding{}, ErrUnauthorized
+	}
+
+	return authBinding{
+		userID:        boundUserID,
+		token:         token,
+		authMode:      authMode,
+		trackID:       query.Get("track_id"),
+		deviceID:      firstNonEmpty(query.Get("deviceID"), query.Get("device_id")),
+		platform:      firstNonEmpty(query.Get("platform"), query.Get("sdkType"), query.Get("sdk_type")),
+		clientVersion: firstNonEmpty(query.Get("clientVersion"), query.Get("client_version")),
+	}, nil
+}
+
+func bindUserIDFromToken(token string) (string, string, error) {
+	// 当前先接入显式 mock token；正式鉴权服务接入后只替换这里的 token binder。
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", "", ErrUnauthorized
+	}
+
+	tokenUserID := userIDFromMockToken(token)
+	if tokenUserID == "" {
+		return "", "", ErrUnauthorized
+	}
+	return tokenUserID, "mock_token_bound", nil
+}
+
+func userIDFromMockToken(token string) string {
+	for _, prefix := range []string{"user:", "uid:", "mock:"} {
+		if strings.HasPrefix(token, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(token, prefix))
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func (h *WebSocketHandler) registerSession(session *websocketSession) {
+	h.hub.Register <- session.connection
+}
+
+func (h *WebSocketHandler) sendWelcome(session *websocketSession) {
 	welcomeMsg := NewMessage(MessageTypePush)
-	connection.SendMessage(welcomeMsg)
+	welcomeMsg.SetMetadata("connectionID", session.connection.ID)
+	welcomeMsg.SetMetadata("userID", session.connection.UserID)
+	_ = session.connection.SendMessage(welcomeMsg)
+}
 
-	// 启动读写协程
-	go connection.WritePump()
-	go connection.ReadPump()
+func (h *WebSocketHandler) startConnectionPumps(session *websocketSession) {
+	go session.connection.WritePump()
+	go session.connection.ReadPump()
+}
+
+func (h *WebSocketHandler) reject(conn *websocket.Conn, err error) {
+	_ = conn.WriteControl(
+		websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.ClosePolicyViolation, err.Error()),
+		time.Now().Add(time.Second),
+	)
+	_ = conn.Close()
 }
 
 // HandleAuth 处理认证请求
@@ -92,7 +201,18 @@ func (h *WebSocketHandler) HandleAuth(conn *Connection, msg *Message) error {
 		conn.SetMetadata("track_id", trackID)
 	}
 	if userID, ok := msg.GetMetadata("user_id"); ok {
-		conn.UserID = userID
+		if userID != "" && userID != conn.UserID {
+			return ErrUnauthorized
+		}
+	}
+	if deviceID, ok := msg.GetMetadata("deviceID"); ok {
+		conn.SetMetadata("deviceID", deviceID)
+	}
+	if platform, ok := msg.GetMetadata("platform"); ok {
+		conn.SetMetadata("platform", platform)
+	}
+	if clientVersion, ok := msg.GetMetadata("clientVersion"); ok {
+		conn.SetMetadata("clientVersion", clientVersion)
 	}
 
 	response := NewMessage(MessageTypeAuth)

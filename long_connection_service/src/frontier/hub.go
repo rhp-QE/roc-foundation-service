@@ -6,10 +6,9 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/util"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/gateway/lifecycle"
+	"github.com/rhp-QE/roc-foundation-service/long_connection_service/src/route"
 )
-
-const connectionMappingTTL = 24 * time.Hour
 
 // Hub 维护所有活跃的连接并处理消息分发
 type Hub struct {
@@ -49,6 +48,11 @@ type Hub struct {
 	// 实际的 ServiceContext 结构体（用于直接访问 Registry 和 Discovery）
 	// 通过类型断言访问实际的 ServiceContext 结构体字段
 	actualServiceCtx interface{}
+
+	// 路由缓存与连接生命周期
+	routeStore route.Store
+	presence   *lifecycle.PresenceLifecycle
+	routeTTL   time.Duration
 }
 
 // HubStats Hub统计信息
@@ -88,6 +92,17 @@ func NewHub(serviceCtx ServiceContext) *Hub {
 	if config.ConnectionTimeout > 0 {
 		connectionTimeout = config.ConnectionTimeout
 	}
+	routeTTL := connectionTimeout + heartbeatInterval
+	if routeTTL < time.Minute {
+		routeTTL = time.Minute
+	}
+
+	var routeStore route.Store
+	var presence *lifecycle.PresenceLifecycle
+	if redis := serviceCtx.GetRedis(); redis != nil {
+		routeStore = route.NewRedisStore(redis, serviceCtx.GetLocalAddress(), routeTTL)
+		presence = lifecycle.NewPresenceLifecycle(routeStore, 2*time.Second)
+	}
 
 	return &Hub{
 		connections:       make(map[string]*Connection),
@@ -100,6 +115,9 @@ func NewHub(serviceCtx ServiceContext) *Hub {
 		stopChan:          make(chan struct{}),
 		stats:             &HubStats{},
 		serviceCtx:        serviceCtx,
+		routeStore:        routeStore,
+		presence:          presence,
+		routeTTL:          routeTTL,
 	}
 }
 
@@ -124,15 +142,19 @@ func (h *Hub) Run() {
 
 // Stop 停止Hub
 func (h *Hub) Stop() {
-	close(h.stopChan)
-
-	// 关闭所有连接
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
+	// 先快照再关闭，避免持锁调用 conn.Close 后反向进入 Unregister 造成死锁。
+	h.mu.RLock()
+	conns := make([]*Connection, 0, len(h.connections))
 	for _, conn := range h.connections {
+		conns = append(conns, conn)
+	}
+	h.mu.RUnlock()
+
+	for _, conn := range conns {
 		conn.Close()
 	}
+
+	close(h.stopChan)
 }
 
 // registerConnection 注册新连接
@@ -157,74 +179,29 @@ func (h *Hub) registerConnection(conn *Connection) {
 	h.stats.ActiveConnections++
 	h.stats.mu.Unlock()
 
-	// 更新 Redis（如果配置了 ServiceContext）
-	if h.serviceCtx != nil && conn.UserID != "" {
-		go h.updateRedisOnRegister(context.Background(), conn)
-	}
-}
-
-// updateRedisOnRegister 在 Redis 中注册连接
-func (h *Hub) updateRedisOnRegister(ctx context.Context, conn *Connection) {
-	if h.serviceCtx == nil {
-		return
-	}
-
-	redis := h.serviceCtx.GetRedis()
-	if redis == nil {
-		return
-	}
-
-	localAddress := h.serviceCtx.GetLocalAddress()
-
-	// 1. 在连接 key 中存储连接所在的机器地址。先写 connection key，再写 user hash，
-	// 避免推送读取到刚写入但尚未可校验的连接映射。
-	connectionKey := util.GetConnectionKeyInCache(conn.ID)
-	err := redis.Set(ctx, connectionKey, localAddress, connectionMappingTTL)
-	if err != nil {
-		klog.Errorf("Failed to set connection address in Redis for connection %s: %v", conn.ID, err)
-		return
-	}
-
-	// 2. 在用户连接 Hash 中添加 connectionID -> 机器地址映射
-	userKey := util.GetUserConnectionKeyInCache(conn.UserID)
-	err = redis.HSet(ctx, userKey, conn.ID, localAddress)
-	if err != nil {
-		klog.Errorf("Failed to update user connection in Redis for user %s: %v", conn.UserID, err)
-		if deleteErr := redis.Delete(ctx, connectionKey); deleteErr != nil {
-			klog.Errorf("Failed to rollback connection key %s after user hash update failed: %v", connectionKey, deleteErr)
-		}
-		return
-	}
-
-	if err := redis.Expire(ctx, userKey, connectionMappingTTL); err != nil {
-		klog.Warnf("Failed to set expire for user connection key %s: %v", userKey, err)
-	}
-
-	klog.Infof("Registered connection %s (user: %s) in Redis at %s", conn.ID, conn.UserID, localAddress)
+	// Hub 写入本地事实后再注册 presence；Redis 失败不影响本机连接可用。
+	h.registerPresence(context.Background(), conn)
 }
 
 // unregisterConnection 注销连接
 func (h *Hub) unregisterConnection(conn *Connection) {
 	h.mu.Lock()
-	userID := conn.UserID
-	connectionID := conn.ID
-	h.mu.Unlock()
-
-	// 先更新 Redis（如果配置了 ServiceContext），避免并发问题
-	if h.serviceCtx != nil && userID != "" {
-		go h.updateRedisOnUnregister(context.Background(), userID, connectionID)
+	existing, ok := h.connections[conn.ID]
+	if !ok {
+		h.mu.Unlock()
+		return
 	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	// 只基于当前 Hub 中同一个 connectionID 的对象注销，延迟 close 不会误删新连接。
+	userID := existing.UserID
+	connectionID := existing.ID
 
 	// 从连接映射中删除
-	delete(h.connections, conn.ID)
+	delete(h.connections, connectionID)
 
 	// 从用户连接映射中删除
 	if userID != "" {
 		if userConns, ok := h.userConnections[userID]; ok {
-			delete(userConns, conn.ID)
+			delete(userConns, connectionID)
 			if len(userConns) == 0 {
 				delete(h.userConnections, userID)
 			}
@@ -233,37 +210,64 @@ func (h *Hub) unregisterConnection(conn *Connection) {
 
 	// 更新统计
 	h.stats.mu.Lock()
-	h.stats.ActiveConnections--
+	if h.stats.ActiveConnections > 0 {
+		h.stats.ActiveConnections--
+	}
 	h.stats.mu.Unlock()
+	h.mu.Unlock()
+
+	h.unregisterPresence(context.Background(), userID, connectionID)
 }
 
-// updateRedisOnUnregister 在 Redis 中注销连接
-func (h *Hub) updateRedisOnUnregister(ctx context.Context, userID, connectionID string) {
-	if h.serviceCtx == nil {
+func (h *Hub) registerPresence(ctx context.Context, conn *Connection) {
+	if h.presence == nil || conn == nil || conn.UserID == "" {
 		return
 	}
+	if err := h.presence.Register(ctx, h.connectionMeta(conn)); err != nil {
+		klog.CtxErrorf(ctx, "Failed to register presence userID=%s connectionID=%s error=%v", conn.UserID, conn.ID, err)
+	}
+}
 
-	redis := h.serviceCtx.GetRedis()
-	if redis == nil {
+func (h *Hub) refreshPresence(ctx context.Context, conn *Connection) {
+	if h.presence == nil || conn == nil || conn.UserID == "" {
 		return
 	}
-
-	// 1. 从用户连接 Hash 中删除 connectionID
-	userKey := util.GetUserConnectionKeyInCache(userID)
-	_, err := redis.HDel(ctx, userKey, connectionID)
-	if err != nil {
-		klog.Errorf("Failed to remove connection from user hash in Redis for user %s: %v", userID, err)
+	if err := h.presence.Refresh(ctx, conn.UserID, conn.ID); err != nil {
+		klog.CtxWarnf(ctx, "Failed to refresh presence userID=%s connectionID=%s error=%v", conn.UserID, conn.ID, err)
 	}
+}
 
-	// 2. 删除连接的机器地址 key
-	connectionKey := util.GetConnectionKeyInCache(connectionID)
-	err = redis.Delete(ctx, connectionKey)
-	if err != nil {
-		klog.Errorf("Failed to delete connection address from Redis for connection %s: %v", connectionID, err)
+func (h *Hub) unregisterPresence(ctx context.Context, userID string, connectionID string) {
+	if h.presence == nil || userID == "" || connectionID == "" {
 		return
 	}
+	if err := h.presence.Unregister(ctx, userID, connectionID); err != nil {
+		klog.CtxErrorf(ctx, "Failed to unregister presence userID=%s connectionID=%s error=%v", userID, connectionID, err)
+	}
+}
 
-	klog.Infof("Unregistered connection %s (user: %s) from Redis", connectionID, userID)
+func (h *Hub) connectionMeta(conn *Connection) route.ConnectionMeta {
+	return route.ConnectionMeta{
+		UserID:        conn.UserID,
+		ConnectionID:  conn.ID,
+		DeviceID:      conn.MetadataString("deviceID"),
+		GatewayID:     h.serviceCtx.GetLocalAddress(),
+		GatewayAddr:   h.serviceCtx.GetLocalAddress(),
+		Platform:      conn.MetadataString("platform"),
+		ClientVersion: conn.MetadataString("clientVersion"),
+		LoginAt:       conn.GetLoginAt().Unix(),
+		LastActiveAt:  conn.GetLastActive().Unix(),
+	}
+}
+
+// RefreshConnectionPresence refreshes the Redis route TTL after a valid client activity.
+func (h *Hub) RefreshConnectionPresence(conn *Connection) {
+	// 活跃事件异步续期 route，避免 Redis 抖动阻塞 read/write pump。
+	go h.refreshPresence(context.Background(), conn)
+}
+
+func (h *Hub) GetRouteStore() route.Store {
+	return h.routeStore
 }
 
 // GetConnection 根据连接ID获取连接

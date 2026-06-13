@@ -41,12 +41,22 @@ message PushDataReq {
   bool broadcast = 3; // 是否广播给所有连接（如果为true，忽略userIDs）
 }
 
+// PushStatus 推送结果状态
+enum PushStatus {
+  PUSH_STATUS_UNKNOWN = 0;
+  PUSH_STATUS_SUCCESS = 1;
+  PUSH_STATUS_NOOP_OFFLINE = 2;
+  PUSH_STATUS_STALE_CLEANED = 3;
+  PUSH_STATUS_FAILED = 4;
+}
+
 // PushResult 推送结果
 message PushResult {
   string userID = 1; // 用户ID
   bool success = 2; // 是否成功
   string error = 3; // 错误信息（如果失败）
   int32 connectionCount = 4; // 推送到的连接数量
+  PushStatus status = 5; // 类型化结果状态
 }
 
 // PushDataResp 推送数据响应
@@ -66,6 +76,7 @@ message PushToConnectionReq {
 message PushToConnectionResp {
   bool success = 1; // 是否成功
   string error = 2; // 错误信息（如果失败）
+  PushStatus status = 3; // 结果状态
 }
 
 // RegisterServiceReq 注册服务请求
@@ -127,4 +138,3 @@ service BackbonService {
   // GetService 获取服务信息
   rpc GetService(GetServiceReq) returns (GetServiceResp);
 }
-
